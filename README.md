@@ -126,8 +126,8 @@ docker build -t runespy-worker .
 
 docker run -d \
   -e WORKER_ID="$(cat ~/.runespy/worker_id)" \
-  -e WORKER_KEY_PEM_B64="$(base64 ~/.runespy/worker_key.pem)" \
-  -e WORKER_SECRET_B64="$(base64 ~/.runespy/worker_secret.key)" \
+  -e WORKER_KEY_PEM_B64="$(base64 < ~/.runespy/worker_key.pem)" \
+  -e WORKER_SECRET_B64="$(base64 < ~/.runespy/worker_secret.key)" \
   -e MASTER_URL="wss://runespy.com" \
   -e MAX_CONCURRENT="5" \
   --name runespy-worker \
@@ -135,7 +135,7 @@ docker run -d \
   runespy-worker
 ```
 
-The container decodes credentials with `base64 -d`, which tolerates line-wrapped output, so no special flags are needed on either Linux or macOS.
+The `< file` stdin redirect works on both Linux and macOS. The container decodes with `base64 -d`, which tolerates line-wrapped output from either platform.
 
 The container writes credentials to `~/.runespy/` at startup and connects to the master automatically.
 
