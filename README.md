@@ -90,10 +90,22 @@ If you prefer to run the worker as a container, build the image and pass credent
 ```bash
 docker build -t runespy-worker .
 
+# Linux:
 docker run -d \
   -e WORKER_ID="<your-worker-uuid>" \
   -e WORKER_KEY_PEM_B64="$(base64 -w0 ~/.runespy/worker_key.pem)" \
   -e WORKER_SECRET_B64="$(base64 -w0 ~/.runespy/worker_secret.key)" \
+  -e MASTER_URL="wss://runespy.com" \
+  -e MAX_CONCURRENT="5" \
+  --name runespy-worker \
+  --restart unless-stopped \
+  runespy-worker
+
+# macOS (base64 does not support -w):
+docker run -d \
+  -e WORKER_ID="<your-worker-uuid>" \
+  -e WORKER_KEY_PEM_B64="$(base64 ~/.runespy/worker_key.pem)" \
+  -e WORKER_SECRET_B64="$(base64 ~/.runespy/worker_secret.key)" \
   -e MASTER_URL="wss://runespy.com" \
   -e MAX_CONCURRENT="5" \
   --name runespy-worker \

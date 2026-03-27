@@ -22,6 +22,7 @@ def register(master, name):
 async def _register(master_url: str, name: str):
     import websockets
     from runespy_worker.crypto import (
+        CONFIG_DIR,
         ensure_config_dir,
         generate_keypair,
         get_public_key_b64,
@@ -31,9 +32,19 @@ async def _register(master_url: str, name: str):
 
     ensure_config_dir()
 
+    key_path = CONFIG_DIR / "worker_key.pem"
+    if key_path.exists():
+        click.echo(
+            f"A keypair already exists at {key_path}.\n"
+            "If you meant to re-register, delete it first:\n"
+            f"  rm {key_path}",
+            err=True,
+        )
+        return
+
     # Generate keypair
     private_key, public_key_b64 = generate_keypair()
-    key_path = save_private_key(private_key)
+    save_private_key(private_key)
     click.echo(f"Generated Ed25519 keypair: {key_path}")
 
     # Connect and register
