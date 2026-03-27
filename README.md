@@ -37,15 +37,31 @@ Workers connect over a persistent WebSocket, receive batches of usernames to loo
 ### 1. Install
 
 ```bash
-git clone https://github.com/glovali/runespy-worker.git
+git clone https://github.com/metalglove/runespy-worker.git
 cd runespy-worker
+```
 
-# With uv (recommended):
+**With uv (recommended):**
+
+```bash
 uv pip install -e .
+```
 
-# Or with pip:
+All subsequent `runespy-worker` commands must be prefixed with `uv run` (e.g. `uv run runespy-worker register ...`), or activate the virtual environment first:
+
+```bash
+source .venv/bin/activate
+```
+
+**With pip:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install .
 ```
+
+With the venv activated, `runespy-worker` is available directly.
 
 ### 2. Register
 
@@ -57,9 +73,13 @@ This generates an Ed25519 keypair at `~/.runespy/worker_key.pem` and registers w
 
 Note the **worker ID** printed — you'll need to share it with the admin.
 
+> **Note:** Running `register` again after a keypair already exists will be blocked with a clear error. If you genuinely need to re-register (e.g. you lost your credentials), delete `~/.runespy/worker_key.pem` first.
+
 ### 3. Wait for approval
 
-Contact the RuneSpy admin (e.g. via Discord) with your worker ID. Once approved, the admin will send you an `encrypted_secret` blob.
+Contact the RuneSpy admin (e.g. via Discord) with your worker ID. The admin will approve your worker and send back an `encrypted_secret` blob.
+
+The secret is only issued once at approval time and is not retrievable again from the server — keep it safe.
 
 ### 4. Save the secret and run
 
@@ -80,6 +100,8 @@ The worker will authenticate, receive task batches, fetch player profiles, and s
 ```bash
 runespy-worker status --master wss://runespy.com
 ```
+
+This shows whether your worker is `pending` or `approved`. It does **not** retrieve or display the shared secret — that is sent to you by the admin out-of-band (e.g. Discord) and saved with `save-secret`.
 
 ---
 
