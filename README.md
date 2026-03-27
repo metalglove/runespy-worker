@@ -107,14 +107,29 @@ This shows whether your worker is `pending` or `approved`. It does **not** retri
 
 ## Running with Docker
 
-If you prefer to run the worker as a container, build the image and pass credentials as environment variables:
+The Docker container is for the **run phase only** — it has no registration flow. You must complete the CLI setup (steps 1–4 above) on any machine with Python first to generate your credentials, then hand those credentials to Docker as environment variables.
+
+### Step 1: Get your credentials via CLI
+
+Follow the [Setup](#setup) section on any machine with Python. After `save-secret` completes you will have three files in `~/.runespy/`:
+
+```
+~/.runespy/worker_id
+~/.runespy/worker_key.pem
+~/.runespy/worker_secret.key
+```
+
+### Step 2: Build and run the container
 
 ```bash
 docker build -t runespy-worker .
+```
 
-# Linux:
+**Linux:**
+
+```bash
 docker run -d \
-  -e WORKER_ID="<your-worker-uuid>" \
+  -e WORKER_ID="$(cat ~/.runespy/worker_id)" \
   -e WORKER_KEY_PEM_B64="$(base64 -w0 ~/.runespy/worker_key.pem)" \
   -e WORKER_SECRET_B64="$(base64 -w0 ~/.runespy/worker_secret.key)" \
   -e MASTER_URL="wss://runespy.com" \
@@ -122,10 +137,13 @@ docker run -d \
   --name runespy-worker \
   --restart unless-stopped \
   runespy-worker
+```
 
-# macOS (base64 does not support -w):
+**macOS** (`base64` does not support `-w`):
+
+```bash
 docker run -d \
-  -e WORKER_ID="<your-worker-uuid>" \
+  -e WORKER_ID="$(cat ~/.runespy/worker_id)" \
   -e WORKER_KEY_PEM_B64="$(base64 ~/.runespy/worker_key.pem)" \
   -e WORKER_SECRET_B64="$(base64 ~/.runespy/worker_secret.key)" \
   -e MASTER_URL="wss://runespy.com" \
@@ -134,6 +152,8 @@ docker run -d \
   --restart unless-stopped \
   runespy-worker
 ```
+
+The container writes credentials to `~/.runespy/` at startup and connects to the master automatically.
 
 ---
 
