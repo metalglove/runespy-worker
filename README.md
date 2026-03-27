@@ -11,7 +11,7 @@ Workers are volunteer-run processes that fetch player data from the RuneMetrics 
                     │   Master    │
                     │  (RuneSpy)  │
                     │  Dispatcher │
-                    └──┬───┬──┬──┘
+                    └──┬───┬──┬───┘
           WebSocket    │   │  │    WebSocket
          ┌─────────────┘   │  └─────────────┐
          │                 │                │
