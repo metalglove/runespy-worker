@@ -5,12 +5,15 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_CACHE=1
 
 WORKDIR /app
 
+# Project files
 COPY pyproject.toml ./
 COPY src/ ./src/
 
+# Install dependencies (creates and populates .venv)
 RUN uv sync --no-dev
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Web UI listens on 8080 (from webui.main)
+EXPOSE 8080
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Run the web UI module
+CMD ["uv", "run", "python", "-m", "runespy_worker.webui"]
