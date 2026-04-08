@@ -151,14 +151,28 @@ def save_secret():
     return redirect(url_for("index"))
 
 
+def require_worker_secret():
+    _, _, secret, _ = read_worker_files()
+    if not secret:
+        return "Worker secret is missing; save the secret before starting the worker", 409
+    return None
+
+
 @app.route("/run-worker", methods=["POST"])
 def run_worker():
+    error = require_worker_secret()
+    if error is not None:
+        return error
+
     start_worker()
     return redirect(url_for("index"))
 
 
 @app.route("/restart-worker", methods=["POST"])
 def restart_worker():
+    error = require_worker_secret()
+    if error is not None:
+        return error
     global worker_process
     if is_worker_running():
         worker_process.terminate()
