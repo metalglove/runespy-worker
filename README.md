@@ -130,7 +130,7 @@ docker run --rm \
 
 Then open `http://localhost:8080` in your browser.
 
-The `~/.runespy` directory is bind-mounted from the host so the web UI and any CLI usage share the same credentials (`worker_id`, keypair, and secret). Credentials persist across container restarts.
+The `~/.runespy` directory is bind-mounted from the host so the web UI and any CLI usage share the same credentials (`worker_id`, keypair, and secret). Credentials persist across container restarts. The container does not automatically create credentials or connect to the master on startup; instead, use the web UI flow below to register the worker and save the approved secret into the shared `~/.runespy` directory.
 
 ### Flow
 
