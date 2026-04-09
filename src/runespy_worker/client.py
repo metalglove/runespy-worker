@@ -219,6 +219,8 @@ async def process_task(
                 data, error = await fetch_hiscores(client, username)
                 if error:
                     error = "PROFILE_PRIVATE"
+            elif error == "NOT_A_MEMBER":
+                logger.info("Player %s is banned (NOT_A_MEMBER)", username)
 
         # Retry direct (no proxy) on proxy failure
         if error == "PROXY_ERROR" and proxy_url:
@@ -229,6 +231,8 @@ async def process_task(
                     data, error = await fetch_hiscores(direct_client, username)
                     if error:
                         error = "PROFILE_PRIVATE"
+                elif error == "NOT_A_MEMBER":
+                    logger.info("Player %s is banned (NOT_A_MEMBER)", username)
 
         fetch_time_ms = time.time() * 1000 - start_ms
 

@@ -38,8 +38,11 @@ rules (e.g. no ``activities`` field is present).
 
 import httpx
 
-_PRIVATE_ERRORS = {
+_BANNED_ERRORS = {
     "not a member", "not_a_member",
+}
+
+_PRIVATE_ERRORS = {
     "profile is private", "profile_private",
     "no profile", "no_profile",
 }
@@ -56,6 +59,7 @@ async def fetch_profile(
     Error codes:
       ``PROFILE_PRIVATE`` — API returned a privacy error; caller should try
                             ``fetch_hiscores`` as a fallback.
+      ``NOT_A_MEMBER``    — player is banned; no fallback attempted.
       ``RATE_LIMITED``    — HTTP 429; caller should back off.
       ``TIMEOUT``         — request timed out after 15 s.
       ``API_ERROR``       — any other HTTP or parsing error.
@@ -72,6 +76,8 @@ async def fetch_profile(
         data = response.json()
         if "error" in data:
             error_msg = str(data["error"]).lower()
+            if any(p in error_msg for p in _BANNED_ERRORS):
+                return None, "NOT_A_MEMBER"
             if any(p in error_msg for p in _PRIVATE_ERRORS):
                 return None, "PROFILE_PRIVATE"
             return None, "API_ERROR"
