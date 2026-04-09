@@ -104,7 +104,11 @@ async def _register(master_url: str, name: str):
 @main.command()
 @click.option("--master", required=True, help="Master server WebSocket URL")
 @click.option("--max-concurrent", default=5, help="Max concurrent fetch tasks")
-def run(master, max_concurrent):
+@click.option("--proxy-url", envvar="PROXY_URL", default=None,
+              help="Single HTTP proxy URL (e.g. http://user:pass@host:port)")
+@click.option("--webshare-api-key", envvar="WEBSHARE_API_KEY", default=None,
+              help="Webshare API key — auto-fetches proxy list and rotates")
+def run(master, max_concurrent, proxy_url, webshare_api_key):
     """Connect to master and start processing tasks."""
     from runespy_worker.crypto import CONFIG_DIR
 
@@ -120,9 +124,54 @@ def run(master, max_concurrent):
         click.echo("Check with: runespy-worker status --master " + master)
         return
 
+    if proxy_url and webshare_api_key:
+        click.echo("Specify either --proxy-url or --webshare-api-key, not both.", err=True)
+        return
+
+    proxy_urls: list[str] = []
+    if webshare_api_key:
+        proxy_urls = _fetch_webshare_proxies(webshare_api_key)
+        if not proxy_urls:
+            click.echo("Failed to fetch proxies from Webshare.", err=True)
+            return
+        click.echo(f"Loaded {len(proxy_urls)} proxies from Webshare")
+    elif proxy_url:
+        proxy_urls = [proxy_url]
+
     from runespy_worker.client import run as client_run
     click.echo("Starting worker...")
-    asyncio.run(client_run(master, max_concurrent=max_concurrent))
+    asyncio.run(client_run(master, max_concurrent=max_concurrent, proxy_urls=proxy_urls))
+
+
+def _fetch_webshare_proxies(api_key: str) -> list[str]:
+    """Fetch proxy list from Webshare API (synchronous, runs before event loop)."""
+    import httpx as _httpx
+
+    proxies: list[str] = []
+    page = 1
+    while True:
+        try:
+            resp = _httpx.get(
+                "https://proxy.webshare.io/api/v2/proxy/list/",
+                params={"mode": "direct", "page": page, "page_size": 100},
+                headers={"Authorization": f"Token {api_key}"},
+                timeout=15,
+            )
+            resp.raise_for_status()
+        except _httpx.HTTPError as e:
+            click.echo(f"Webshare API error: {e}", err=True)
+            return []
+
+        data = resp.json()
+        for p in data.get("results", []):
+            url = f"http://{p['username']}:{p['password']}@{p['proxy_address']}:{p['port']}"
+            proxies.append(url)
+
+        if not data.get("next"):
+            break
+        page += 1
+
+    return proxies
 
 
 @main.command()

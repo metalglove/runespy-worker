@@ -39,6 +39,7 @@ authentication and cancelled on disconnect so they do not outlive the WebSocket.
 """
 
 import asyncio
+import itertools
 import json
 import logging
 import time
@@ -180,7 +181,7 @@ async def process_task(
     task: dict,
     worker_id: str,
     secret: bytes,
-    http_client: httpx.AsyncClient,
+    proxy_cycle: itertools.cycle | None,
     semaphore: asyncio.Semaphore,
     rate_limiter: RateLimiter,
     fetch_delay: float = 4.0,
@@ -205,16 +206,30 @@ async def process_task(
         task_id = task["task_id"]
         username = task["username"]
 
-        logger.info("\033[36mFetching\033[0m %s", username)
+        proxy_url = next(proxy_cycle) if proxy_cycle else None
+        logger.info("\033[36mFetching\033[0m %s%s", username,
+                    f" via {proxy_url.split('@')[-1]}" if proxy_url else "")
 
         await rate_limiter.acquire()
         start_ms = time.time() * 1000
-        data, error = await fetch_profile(http_client, username)
-        if error == "PROFILE_PRIVATE":
-            logger.info("Profile private for %s, trying hiscores fallback", username)
-            data, error = await fetch_hiscores(http_client, username)
-            if error:
-                error = "PROFILE_PRIVATE"
+        async with httpx.AsyncClient(proxy=proxy_url) as client:
+            data, error = await fetch_profile(client, username)
+            if error == "PROFILE_PRIVATE":
+                logger.info("Profile private for %s, trying hiscores fallback", username)
+                data, error = await fetch_hiscores(client, username)
+                if error:
+                    error = "PROFILE_PRIVATE"
+
+        # Retry direct (no proxy) on proxy failure
+        if error == "PROXY_ERROR" and proxy_url:
+            logger.warning("Proxy failed for %s, retrying direct", username)
+            async with httpx.AsyncClient() as direct_client:
+                data, error = await fetch_profile(direct_client, username)
+                if error == "PROFILE_PRIVATE":
+                    data, error = await fetch_hiscores(direct_client, username)
+                    if error:
+                        error = "PROFILE_PRIVATE"
+
         fetch_time_ms = time.time() * 1000 - start_ms
 
         if error:
@@ -248,7 +263,7 @@ async def process_task(
         await asyncio.sleep(fetch_delay)
 
 
-async def run(master_url: str, max_concurrent: int = 5):
+async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | None = None):
     """Connect to the master server and run the worker until interrupted.
 
     Loads credentials from ``~/.runespy/`` (worker_id, private key, shared
@@ -273,6 +288,14 @@ async def run(master_url: str, max_concurrent: int = 5):
     logger.info("Worker ID: %s", worker_id)
     logger.info("Ed25519 public key loaded")
     logger.info("HMAC shared secret loaded (%d bytes)", len(secret))
+
+    proxy_cycle = None
+    if proxy_urls:
+        proxy_cycle = itertools.cycle(proxy_urls)
+        for p in proxy_urls:
+            masked = p.split("@")[-1] if "@" in p else p
+            logger.info("Proxy: %s", masked)
+        logger.info("Rotating across %d proxies", len(proxy_urls))
 
     ws_url = f"{master_url}/api/workers/ws/connect?worker_id={worker_id}"
 
@@ -330,11 +353,13 @@ async def run(master_url: str, max_concurrent: int = 5):
                 rate_limiter = RateLimiter(rate=rate_limit_per_hour)
 
                 # Send ready
-                ready_msg = build_message("ready", {
-                    "capacity": max_concurrent,
-                }, worker_id, secret)
+                ready_payload = {"capacity": max_concurrent}
+                if proxy_urls:
+                    ready_payload["has_proxy"] = True
+                    ready_payload["proxy_count"] = len(proxy_urls)
+                ready_msg = build_message("ready", ready_payload, worker_id, secret)
                 await ws.send(ready_msg)
-                logger.info("Sent ready (capacity=%d) — waiting for tasks", max_concurrent)
+                logger.info("Sent ready (capacity=%d, proxies=%d) — waiting for tasks", max_concurrent, len(proxy_urls or []))
 
                 semaphore = asyncio.Semaphore(max_concurrent)
                 result_queue: asyncio.Queue = asyncio.Queue()
@@ -347,63 +372,64 @@ async def run(master_url: str, max_concurrent: int = 5):
                 )
 
                 try:
-                    async with httpx.AsyncClient() as http_client:
-                        async for raw in ws:
-                            msg = json.loads(raw)
-                            msg_type = msg.get("type")
+                    async for raw in ws:
+                        msg = json.loads(raw)
+                        msg_type = msg.get("type")
 
-                            if msg_type == "assign_batch":
-                                tasks = msg.get("payload", {}).get("tasks", [])
-                                usernames = [t["username"] for t in tasks]
-                                logger.info(
-                                    "\033[33mBatch received\033[0m — %d task(s): %s",
-                                    len(tasks),
-                                    ", ".join(usernames[:10]) + ("..." if len(usernames) > 10 else ""),
-                                )
-                                for task in tasks:
-                                    asyncio.create_task(
-                                        process_task(
-                                            result_queue, task, worker_id, secret,
-                                            http_client, semaphore, rate_limiter, fetch_delay,
-                                        )
+                        if msg_type == "assign_batch":
+                            tasks = msg.get("payload", {}).get("tasks", [])
+                            usernames = [t["username"] for t in tasks]
+                            logger.info(
+                                "\033[33mBatch received\033[0m — %d task(s): %s",
+                                len(tasks),
+                                ", ".join(usernames[:10]) + ("..." if len(usernames) > 10 else ""),
+                            )
+                            for task in tasks:
+                                asyncio.create_task(
+                                    process_task(
+                                        result_queue, task, worker_id, secret,
+                                        proxy_cycle, semaphore, rate_limiter, fetch_delay,
                                     )
-
-                            elif msg_type == "config":
-                                payload = msg.get("payload", {})
-                                new_delay = payload.get("fetch_delay")
-                                new_concurrent = payload.get("max_concurrent")
-                                new_rate = payload.get("rate_limit_per_hour")
-                                if new_delay is not None:
-                                    fetch_delay = float(new_delay)
-                                if new_concurrent is not None:
-                                    new_concurrent = int(new_concurrent)
-                                    semaphore = asyncio.Semaphore(new_concurrent)
-                                    max_concurrent = new_concurrent
-                                if new_rate is not None:
-                                    rate_limiter = RateLimiter(rate=int(new_rate))
-                                logger.info(
-                                    "\033[36mConfig updated\033[0m — fetch_delay=%.1fs, max_concurrent=%d, rate_limit=%d/hr",
-                                    fetch_delay, max_concurrent, rate_limiter._rate,
                                 )
-                                # Acknowledge with updated capacity
-                                ready_msg = build_message("ready", {
-                                    "capacity": max_concurrent,
-                                }, worker_id, secret)
-                                await ws.send(ready_msg)
 
-                            elif msg_type == "heartbeat_ack":
-                                logger.debug("Heartbeat ACK received")
+                        elif msg_type == "config":
+                            payload = msg.get("payload", {})
+                            new_delay = payload.get("fetch_delay")
+                            new_concurrent = payload.get("max_concurrent")
+                            new_rate = payload.get("rate_limit_per_hour")
+                            if new_delay is not None:
+                                fetch_delay = float(new_delay)
+                            if new_concurrent is not None:
+                                new_concurrent = int(new_concurrent)
+                                semaphore = asyncio.Semaphore(new_concurrent)
+                                max_concurrent = new_concurrent
+                            if new_rate is not None:
+                                rate_limiter = RateLimiter(rate=int(new_rate))
+                            logger.info(
+                                "\033[36mConfig updated\033[0m — fetch_delay=%.1fs, max_concurrent=%d, rate_limit=%d/hr",
+                                fetch_delay, max_concurrent, rate_limiter._rate,
+                            )
+                            # Acknowledge with updated capacity
+                            ready_payload = {"capacity": max_concurrent}
+                            if proxy_urls:
+                                ready_payload["has_proxy"] = True
+                                ready_payload["proxy_count"] = len(proxy_urls)
+                            ready_msg = build_message("ready", ready_payload, worker_id, secret)
+                            await ws.send(ready_msg)
 
-                            elif msg_type == "revoke":
-                                task_ids = msg.get("payload", {}).get("task_ids", [])
-                                logger.warning("Tasks revoked by master: %s", task_ids)
+                        elif msg_type == "heartbeat_ack":
+                            logger.debug("Heartbeat ACK received")
 
-                            elif msg_type == "shutdown":
-                                logger.warning("\033[31mShutdown requested by master\033[0m")
-                                break
+                        elif msg_type == "revoke":
+                            task_ids = msg.get("payload", {}).get("task_ids", [])
+                            logger.warning("Tasks revoked by master: %s", task_ids)
 
-                            else:
-                                logger.debug("Unknown message type: %s", msg_type)
+                        elif msg_type == "shutdown":
+                            logger.warning("\033[31mShutdown requested by master\033[0m")
+                            break
+
+                        else:
+                            logger.debug("Unknown message type: %s", msg_type)
 
                 finally:
                     heartbeat_task.cancel()

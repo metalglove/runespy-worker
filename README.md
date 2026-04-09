@@ -220,11 +220,69 @@ PENDING ──▶ ASSIGNED ──▶ SUCCESS
 
 ---
 
+## Using proxies
+
+Workers can optionally route API requests through HTTP proxies. This spreads traffic across multiple IPs, allowing higher throughput and reducing the chance of rate limiting.
+
+[Webshare](https://www.webshare.io/) is the recommended provider. Their shared datacenter proxy plan at $2.99/mo (100 proxies, 250 GB bandwidth) is sufficient for tracking up to ~10,000 players at 20-minute intervals.
+
+### Setup
+
+1. Create a [Webshare](https://www.webshare.io/) account (free tier includes 10 proxies)
+2. Go to **Dashboard > API** and copy your API key
+3. Pass it when starting your worker:
+
+```bash
+# Via environment variable
+export WEBSHARE_API_KEY="your-api-key"
+runespy-worker run --master wss://runespy.com
+
+# Or via CLI flag
+runespy-worker run --master wss://runespy.com --webshare-api-key "your-api-key"
+```
+
+The worker automatically fetches your proxy list from Webshare's API on startup and rotates through them round-robin. The master detects how many proxies you have and scales your rate limits and concurrency accordingly — no manual tuning needed.
+
+### Docker with proxies
+
+Add the environment variable to your `docker run` command:
+
+```bash
+docker run -d \
+  -e WORKER_ID="$(cat ~/.runespy/worker_id)" \
+  -e WORKER_KEY_PEM_B64="$(base64 < ~/.runespy/worker_key.pem)" \
+  -e WORKER_SECRET_B64="$(base64 < ~/.runespy/worker_secret.key)" \
+  -e MASTER_URL="wss://runespy.com" \
+  -e WEBSHARE_API_KEY="your-api-key" \
+  --name runespy-worker \
+  --restart unless-stopped \
+  runespy-worker
+```
+
+### Single proxy
+
+If you have your own proxy (not from Webshare), you can pass it directly:
+
+```bash
+runespy-worker run --master wss://runespy.com --proxy-url "http://user:pass@host:port"
+```
+
+### Scaling reference
+
+| Proxies | Players (20-min poll) | Webshare plan |
+|---------|----------------------|---------------|
+| 10 | ~1,000 | Free |
+| 50 | ~5,000 | 100 proxies ($2.99/mo) |
+| 100 | ~10,000 | 100 proxies ($2.99/mo) |
+
+---
+
 ## CLI reference
 
 ```
 runespy-worker register    --master <url> --name <name>
 runespy-worker save-secret --encrypted <base64_blob>
 runespy-worker run         --master <url> [--max-concurrent <n>]
+                           [--webshare-api-key <key>] [--proxy-url <url>]
 runespy-worker status      --master <url>
 ```

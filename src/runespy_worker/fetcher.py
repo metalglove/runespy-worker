@@ -78,6 +78,8 @@ async def fetch_profile(
         return data, None
     except httpx.TimeoutException:
         return None, "TIMEOUT"
+    except httpx.ProxyError:
+        return None, "PROXY_ERROR"
     except httpx.ConnectError:
         return None, "API_ERROR"
     except httpx.HTTPStatusError as e:
@@ -153,5 +155,7 @@ async def fetch_hiscores(
             "_source": "hiscores",
         }
         return data, None
+    except httpx.ProxyError:
+        return None, "PROXY_ERROR"
     except (httpx.HTTPError, ValueError, IndexError):
         return None, "API_ERROR"

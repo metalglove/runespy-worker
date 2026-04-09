@@ -23,4 +23,10 @@ printf '%s' "$WORKER_SECRET_B64"  | base64 -d > "$CRED_DIR/worker_secret.key"
 chmod 600 "$CRED_DIR/worker_key.pem" "$CRED_DIR/worker_secret.key"
 
 echo "Credentials written for worker $WORKER_ID"
-exec uv run runespy-worker run --master "$MASTER_URL" --max-concurrent "${MAX_CONCURRENT:-5}"
+
+EXTRA_ARGS=""
+if [ -n "$WEBSHARE_API_KEY" ]; then
+    EXTRA_ARGS="--webshare-api-key $WEBSHARE_API_KEY"
+fi
+
+exec uv run runespy-worker run --master "$MASTER_URL" --max-concurrent "${MAX_CONCURRENT:-5}" $EXTRA_ARGS
