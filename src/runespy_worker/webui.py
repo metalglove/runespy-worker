@@ -208,16 +208,16 @@ def save_proxy_config():
     proxy_url = request.form.get("proxy_url", "").strip() or None
 
     if webshare_key and proxy_url:
-        return redirect(url_for("index", error="Choose either Webshare API key or a single proxy URL, not both."))
+        return redirect(url_for("index", error="Choose either Webshare API key or a single proxy URL, not both.", tab="settings"))
 
     _save_proxy_config(webshare_key, proxy_url)
 
     if _is_running():
         _stop_worker()
         _start_worker()
-        return redirect(url_for("index", success="Proxy config saved. Worker restarted."))
+        return redirect(url_for("index", success="Proxy config saved. Worker restarted.", tab="settings"))
 
-    return redirect(url_for("index", success="Proxy config saved."))
+    return redirect(url_for("index", success="Proxy config saved.", tab="settings"))
 
 
 @app.route("/run-worker", methods=["POST"])

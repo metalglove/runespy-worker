@@ -36,7 +36,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 32px;
+      margin-bottom: 24px;
       padding-bottom: 16px;
       border-bottom: 1px solid var(--border);
     }
@@ -53,6 +53,32 @@
     .badge-connecting, .badge-reconnecting { background: var(--yellow-dim); color: var(--yellow); }
     .badge-stopped, .badge-error { background: var(--red-dim); color: var(--red); }
     .badge-starting, .badge-authenticated { background: var(--accent-dim); color: var(--accent); }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
 
     /* Cards */
     .card {
@@ -98,12 +124,6 @@
     .step-check { color: var(--green); }
 
     /* Forms */
-    .form-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 8px;
-    }
     input[type="text"], textarea {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -141,8 +161,7 @@
     .btn-danger { background: var(--red-dim); color: var(--red); }
     .btn-success { background: var(--green-dim); color: var(--green); }
     .btn-secondary { background: var(--surface2); color: var(--text-dim); }
-    .btn-sm { padding: 5px 12px; font-size: 12px; }
-    .btn-group { display: flex; gap: 8px; }
+    .btn-group { display: flex; gap: 8px; align-items: center; }
 
     /* Stats grid */
     .stats-grid {
@@ -205,7 +224,6 @@
       font-size: 12px;
       font-family: 'SF Mono', 'Fira Code', monospace;
     }
-    .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
 
     /* Flash messages */
     .flash {
@@ -217,11 +235,30 @@
     .flash-error { background: var(--red-dim); color: var(--red); }
     .flash-success { background: var(--green-dim); color: var(--green); }
 
+    /* Section divider */
+    .section-divider {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      margin: 8px 0 12px;
+      position: relative;
+    }
+    .section-divider::before,
+    .section-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: var(--border);
+    }
+    .section-divider::before { left: 0; }
+    .section-divider::after { right: 0; }
+
     /* Utility */
     .mt-8 { margin-top: 8px; }
     .mt-16 { margin-top: 16px; }
     .mb-8 { margin-bottom: 8px; }
-    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -242,177 +279,235 @@
       <div class="flash flash-success">{{ flash_success }}</div>
     {% endif %}
 
-    {# ── Step 1: Register ── #}
-    <div class="card step {{ 'done' if worker_id else 'active' }}">
-      <div class="step-header">
-        <div class="step-num">{% if worker_id %}<span class="step-check">&#10003;</span>{% else %}1{% endif %}</div>
-        <span class="step-title">Register worker</span>
+    {# ── Show setup flow if not fully registered ── #}
+    {% if not has_secret %}
+
+      {# ── Step 1: Register ── #}
+      <div class="card step {{ 'done' if worker_id else 'active' }}">
+        <div class="step-header">
+          <div class="step-num">{% if worker_id %}<span class="step-check">&#10003;</span>{% else %}1{% endif %}</div>
+          <span class="step-title">Register worker</span>
+        </div>
+        <div class="step-body">
+          {% if worker_id %}
+            <p class="info">Registered as <code>{{ worker_id }}</code></p>
+            {% if worker_name %}<p class="info">Name: <code>{{ worker_name }}</code></p>{% endif %}
+          {% else %}
+            <form method="post" action="/register">
+              <div class="field">
+                <label>Worker name</label>
+                <input type="text" name="name" placeholder="my-macbook" required>
+              </div>
+              <button type="submit">Register with master</button>
+            </form>
+            <p class="info mt-8">This generates an Ed25519 keypair and registers with the master server.</p>
+          {% endif %}
+        </div>
       </div>
-      <div class="step-body">
-        {% if worker_id %}
-          <p class="info">Registered as <code>{{ worker_id }}</code></p>
-          {% if worker_name %}<p class="info">Name: <code>{{ worker_name }}</code></p>{% endif %}
-        {% else %}
-          <form method="post" action="/register">
-            <div class="field">
-              <label>Worker name</label>
-              <input type="text" name="name" placeholder="my-macbook" required>
+
+      {# ── Step 2: Save secret ── #}
+      <div class="card step {{ 'active' if worker_id else 'locked' }}">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <span class="step-title">Save shared secret</span>
+        </div>
+        <div class="step-body">
+          {% if worker_id %}
+            <p class="info mb-8">Share your worker ID with the RuneSpy admin. Once approved, paste the encrypted secret below.</p>
+            <form method="post" action="/save-secret">
+              <div class="field">
+                <label>Encrypted secret (base64)</label>
+                <textarea name="encrypted" placeholder="Paste the base64 blob from the admin here..." required></textarea>
+              </div>
+              <button type="submit">Save secret</button>
+            </form>
+          {% else %}
+            <p class="info">Register first to get a worker ID.</p>
+          {% endif %}
+        </div>
+      </div>
+
+    {% else %}
+
+      {# ── Fully registered: show tabs ── #}
+      <div class="tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      {# ── Dashboard tab ── #}
+      <div class="tab-panel active" id="tab-dashboard">
+
+        {# ── Worker controls ── #}
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <p class="info">Worker <code>{{ worker_id }}</code>{% if worker_name %} ({{ worker_name }}){% endif %}</p>
             </div>
-            <button type="submit">Register with master</button>
-          </form>
-          <p class="info mt-8">This generates an Ed25519 keypair and registers with the master server.</p>
+            <div class="btn-group">
+              {% if is_running %}
+                <form method="post" action="/restart-worker"><button type="submit" class="btn-secondary">Restart</button></form>
+                <form method="post" action="/stop-worker"><button type="submit" class="btn-danger">Stop</button></form>
+              {% else %}
+                <form method="post" action="/run-worker"><button type="submit" class="btn-success">Start worker</button></form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {# ── Stats ── #}
+        {% if stats %}
+        <div class="card">
+          <h2>Statistics</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.stats.completed }}</div>
+              <div class="stat-label">Tasks completed</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.stats.failed }}</div>
+              <div class="stat-label">Tasks failed</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.stats.batches_received }}</div>
+              <div class="stat-label">Batches received</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.stats.batches_sent }}</div>
+              <div class="stat-label">Batches sent</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ uptime_display }}</div>
+              <div class="stat-label">Uptime</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.proxy_count }}</div>
+              <div class="stat-label">Proxies</div>
+            </div>
+          </div>
+
+          {% if stats.config %}
+          <h2 class="mt-16">Server config</h2>
+          <div class="config-grid">
+            <div class="config-item">
+              <span class="config-key">Rate limit</span>
+              <span class="config-val">{{ stats.config.rate_limit_per_hour }}/hr</span>
+            </div>
+            <div class="config-item">
+              <span class="config-key">Fetch delay</span>
+              <span class="config-val">{{ stats.config.fetch_delay }}s</span>
+            </div>
+            <div class="config-item">
+              <span class="config-key">Concurrency</span>
+              <span class="config-val">{{ stats.config.max_concurrent }}</span>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# ── Logs ── #}
+        {% if logs %}
+        <div class="card">
+          <h2>Recent logs</h2>
+          <div class="log-viewer" id="log-viewer">
+            {% for line in logs %}
+              <div class="log-line {{ 'log-error' if '[ERROR]' in line or ('[WARNING]' in line and 'Failed' in line) else ('log-warning' if '[WARNING]' in line else ('log-info-highlight' if 'Fetched' in line or 'Batch sent' in line or 'Authenticated' in line else '')) }}">{{ line }}</div>
+            {% endfor %}
+          </div>
+        </div>
         {% endif %}
       </div>
-    </div>
 
-    {# ── Step 2: Save secret ── #}
-    <div class="card step {{ 'done' if has_secret else ('active' if worker_id else 'locked') }}">
-      <div class="step-header">
-        <div class="step-num">{% if has_secret %}<span class="step-check">&#10003;</span>{% else %}2{% endif %}</div>
-        <span class="step-title">Save shared secret</span>
-      </div>
-      <div class="step-body">
-        {% if has_secret %}
-          <p class="info">Shared secret is saved.</p>
-        {% elif worker_id %}
-          <p class="info mb-8">Share your worker ID with the RuneSpy admin. Once approved, paste the encrypted secret below.</p>
-          <form method="post" action="/save-secret">
-            <div class="field">
-              <label>Encrypted secret (base64)</label>
-              <textarea name="encrypted" placeholder="Paste the base64 blob from the admin here..." required></textarea>
-            </div>
-            <button type="submit">Save secret</button>
-          </form>
-        {% else %}
-          <p class="info">Register first to get a worker ID.</p>
-        {% endif %}
-      </div>
-    </div>
+      {# ── Settings tab ── #}
+      <div class="tab-panel" id="tab-settings">
 
-    {# ── Step 3: Proxy configuration ── #}
-    <div class="card step {{ 'active' if has_secret and not is_running else ('done' if has_secret else 'locked') }}">
-      <div class="step-header">
-        <div class="step-num">3</div>
-        <span class="step-title">Proxy configuration <span class="info">(optional)</span></span>
-      </div>
-      <div class="step-body">
-        {% if has_secret %}
-          <p class="info mb-8">Route API requests through proxies for higher throughput. Leave empty to fetch directly.</p>
+        {# ── Proxy configuration ── #}
+        <div class="card">
+          <h2>Proxy configuration</h2>
+          <p class="info mb-8">Route API requests through proxies for higher throughput. The master scales your rate limits based on proxy count. Leave both empty to fetch directly.</p>
           <form method="post" action="/save-proxy-config">
             <div class="field">
               <label>Webshare API key</label>
-              <input type="text" name="webshare_api_key" value="{{ webshare_api_key or '' }}" placeholder="bevvqpw6ox1mqo3742ivywazluq1ofq9eeve54fh">
+              <input type="text" name="webshare_api_key" value="{{ webshare_api_key or '' }}" placeholder="your-webshare-api-key">
             </div>
-            <p class="info mb-8">— or —</p>
+            <div class="section-divider">or</div>
             <div class="field">
               <label>Single proxy URL</label>
               <input type="text" name="proxy_url" value="{{ proxy_url or '' }}" placeholder="http://user:pass@host:port">
             </div>
-            <button type="submit">Save proxy config</button>
-            {% if webshare_api_key or proxy_url %}
-              <span class="info" style="margin-left: 8px;">Currently configured: <code>{{ 'Webshare (' + proxy_count|string + ' proxies)' if webshare_api_key else proxy_url }}</code></span>
-            {% endif %}
+            <div class="btn-group">
+              <button type="submit">Save</button>
+              {% if webshare_api_key or proxy_url %}
+                <span class="info">Active: <code>{{ 'Webshare (' + proxy_count|string + ' proxies)' if webshare_api_key else proxy_url }}</code></span>
+              {% else %}
+                <span class="info">No proxy configured — fetching directly.</span>
+              {% endif %}
+            </div>
           </form>
-        {% else %}
-          <p class="info">Complete registration first.</p>
-        {% endif %}
-      </div>
-    </div>
+        </div>
 
-    {# ── Step 4: Run worker ── #}
-    <div class="card step {{ 'active' if has_secret else 'locked' }}">
-      <div class="step-header">
-        <div class="step-num">4</div>
-        <span class="step-title">Run worker</span>
-      </div>
-      <div class="step-body">
-        {% if has_secret %}
-          <div class="btn-group">
-            {% if is_running %}
-              <form method="post" action="/restart-worker"><button type="submit" class="btn-danger">Restart</button></form>
-              <form method="post" action="/stop-worker"><button type="submit" class="btn-danger">Stop</button></form>
-            {% else %}
-              <form method="post" action="/run-worker"><button type="submit" class="btn-success">Start worker</button></form>
+        {# ── Worker info ── #}
+        <div class="card">
+          <h2>Worker identity</h2>
+          <div class="config-grid">
+            <div class="config-item">
+              <span class="config-key">Worker ID</span>
+              <span class="config-val">{{ worker_id[:12] }}...</span>
+            </div>
+            {% if worker_name %}
+            <div class="config-item">
+              <span class="config-key">Name</span>
+              <span class="config-val">{{ worker_name }}</span>
+            </div>
             {% endif %}
+            <div class="config-item">
+              <span class="config-key">Secret</span>
+              <span class="config-val" style="color: var(--green);">saved</span>
+            </div>
           </div>
-        {% else %}
-          <p class="info">Save the shared secret before starting.</p>
-        {% endif %}
-      </div>
-    </div>
-
-    {# ── Stats dashboard (only when running or has stats) ── #}
-    {% if stats %}
-    <div class="card">
-      <h2>Statistics</h2>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.stats.completed }}</div>
-          <div class="stat-label">Tasks completed</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.stats.failed }}</div>
-          <div class="stat-label">Tasks failed</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.stats.batches_received }}</div>
-          <div class="stat-label">Batches received</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.stats.batches_sent }}</div>
-          <div class="stat-label">Batches sent</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ uptime_display }}</div>
-          <div class="stat-label">Uptime</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.proxy_count }}</div>
-          <div class="stat-label">Proxies</div>
         </div>
       </div>
 
-      {% if stats.config %}
-      <h2 class="mt-16">Server config</h2>
-      <div class="config-grid">
-        <div class="config-item">
-          <span class="config-key">Rate limit</span>
-          <span class="config-val">{{ stats.config.rate_limit_per_hour }}/hr</span>
-        </div>
-        <div class="config-item">
-          <span class="config-key">Fetch delay</span>
-          <span class="config-val">{{ stats.config.fetch_delay }}s</span>
-        </div>
-        <div class="config-item">
-          <span class="config-key">Concurrency</span>
-          <span class="config-val">{{ stats.config.max_concurrent }}</span>
-        </div>
-      </div>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    {# ── Log viewer ── #}
-    {% if logs %}
-    <div class="card">
-      <h2>Recent logs</h2>
-      <div class="log-viewer" id="log-viewer">
-        {% for line in logs %}
-          <div class="log-line {{ 'log-error' if '[ERROR]' in line or '[WARNING]' in line and 'Failed' in line else ('log-warning' if '[WARNING]' in line else ('log-info-highlight' if 'Fetched' in line or 'Batch sent' in line or 'Authenticated' in line else '')) }}">{{ line }}</div>
-        {% endfor %}
-      </div>
-    </div>
     {% endif %}
   </div>
 
   <script>
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        // Persist tab choice
+        history.replaceState(null, '', '?tab=' + tab.dataset.tab);
+      });
+    });
+
+    // Restore tab from URL
+    const params = new URLSearchParams(location.search);
+    const activeTab = params.get('tab');
+    if (activeTab) {
+      document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === activeTab);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => {
+        p.classList.toggle('active', p.id === 'tab-' + activeTab);
+      });
+    }
+
     // Auto-scroll log viewer to bottom
     const lv = document.getElementById('log-viewer');
     if (lv) lv.scrollTop = lv.scrollHeight;
 
-    // Auto-refresh when worker is running
+    // Auto-refresh when worker is running (preserve current tab)
     {% if is_running %}
-    setTimeout(() => location.reload(), 10000);
+    setTimeout(() => {
+      const url = new URL(location.href);
+      // Preserve tab param across refresh
+      location.replace(url.href);
+    }, 10000);
     {% endif %}
   </script>
 </body>
