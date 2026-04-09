@@ -265,11 +265,7 @@
   <div class="container">
     <div class="header">
       <h1>RuneSpy Worker</h1>
-      {% if worker_status %}
-        <span class="badge badge-{{ worker_status }}">{{ worker_status }}</span>
-      {% else %}
-        <span class="badge badge-stopped">not running</span>
-      {% endif %}
+      <span class="badge badge-{{ worker_status or 'stopped' }}" id="status-badge">{{ worker_status or 'not running' }}</span>
     </div>
 
     {% if flash_error %}
@@ -361,48 +357,46 @@
           <h2>Statistics</h2>
           <div class="stats-grid">
             <div class="stat-card">
-              <div class="stat-value">{{ stats.stats.completed }}</div>
+              <div class="stat-value" id="stat-completed">{{ stats.stats.completed }}</div>
               <div class="stat-label">Tasks completed</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value">{{ stats.stats.failed }}</div>
+              <div class="stat-value" id="stat-failed">{{ stats.stats.failed }}</div>
               <div class="stat-label">Tasks failed</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value">{{ stats.stats.batches_received }}</div>
+              <div class="stat-value" id="stat-batches-recv">{{ stats.stats.batches_received }}</div>
               <div class="stat-label">Batches received</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value">{{ stats.stats.batches_sent }}</div>
+              <div class="stat-value" id="stat-batches-sent">{{ stats.stats.batches_sent }}</div>
               <div class="stat-label">Batches sent</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value">{{ uptime_display }}</div>
+              <div class="stat-value" id="stat-uptime">{{ uptime_display }}</div>
               <div class="stat-label">Uptime</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value">{{ stats.proxy_count }}</div>
+              <div class="stat-value" id="stat-proxies">{{ stats.proxy_count }}</div>
               <div class="stat-label">Proxies</div>
             </div>
           </div>
 
-          {% if stats.config %}
           <h2 class="mt-16">Server config</h2>
           <div class="config-grid">
             <div class="config-item">
               <span class="config-key">Rate limit</span>
-              <span class="config-val">{{ stats.config.rate_limit_per_hour }}/hr</span>
+              <span class="config-val" id="cfg-rate">{{ stats.config.rate_limit_per_hour if stats.config else '—' }}/hr</span>
             </div>
             <div class="config-item">
               <span class="config-key">Fetch delay</span>
-              <span class="config-val">{{ stats.config.fetch_delay }}s</span>
+              <span class="config-val" id="cfg-delay">{{ stats.config.fetch_delay if stats.config else '—' }}s</span>
             </div>
             <div class="config-item">
               <span class="config-key">Concurrency</span>
-              <span class="config-val">{{ stats.config.max_concurrent }}</span>
+              <span class="config-val" id="cfg-concurrent">{{ stats.config.max_concurrent if stats.config else '—' }}</span>
             </div>
           </div>
-          {% endif %}
         </div>
         {% endif %}
 
@@ -501,13 +495,86 @@
     const lv = document.getElementById('log-viewer');
     if (lv) lv.scrollTop = lv.scrollHeight;
 
-    // Auto-refresh when worker is running (preserve current tab)
-    {% if is_running %}
-    setTimeout(() => {
-      const url = new URL(location.href);
-      // Preserve tab param across refresh
-      location.replace(url.href);
-    }, 10000);
+    // Live updates via /api/stats
+    {% if has_secret %}
+    function formatUptime(s) {
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+      return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+    }
+
+    function classifyLog(line) {
+      if (line.includes('[ERROR]') || (line.includes('[WARNING]') && line.includes('Failed'))) return 'log-error';
+      if (line.includes('[WARNING]')) return 'log-warning';
+      if (line.includes('Fetched') || line.includes('Batch sent') || line.includes('Authenticated')) return 'log-info-highlight';
+      return '';
+    }
+
+    let prevLogCount = 0;
+
+    async function refresh() {
+      try {
+        const res = await fetch('/api/stats');
+        const d = await res.json();
+        if (!d.stats) return;
+
+        // Status badge
+        const badge = document.getElementById('status-badge');
+        if (badge) {
+          const status = d.status || (d.is_running ? 'running' : 'stopped');
+          badge.textContent = status;
+          badge.className = 'badge badge-' + status;
+        }
+
+        // Stats
+        const el = (id) => document.getElementById(id);
+        if (el('stat-completed')) el('stat-completed').textContent = d.stats.completed;
+        if (el('stat-failed')) el('stat-failed').textContent = d.stats.failed;
+        if (el('stat-batches-recv')) el('stat-batches-recv').textContent = d.stats.batches_received;
+        if (el('stat-batches-sent')) el('stat-batches-sent').textContent = d.stats.batches_sent;
+        if (el('stat-uptime')) el('stat-uptime').textContent = formatUptime(d.uptime || 0);
+        if (el('stat-proxies')) el('stat-proxies').textContent = d.proxy_count || 0;
+
+        // Config
+        if (d.config) {
+          if (el('cfg-rate')) el('cfg-rate').textContent = (d.config.rate_limit_per_hour || '—') + '/hr';
+          if (el('cfg-delay')) el('cfg-delay').textContent = (d.config.fetch_delay || '—') + 's';
+          if (el('cfg-concurrent')) el('cfg-concurrent').textContent = d.config.max_concurrent || '—';
+        }
+
+        // Logs — append only new lines
+        const viewer = document.getElementById('log-viewer');
+        if (viewer && d.logs) {
+          const newLines = d.logs.length > prevLogCount ? d.logs.slice(prevLogCount) : [];
+          if (d.logs.length < prevLogCount) {
+            // Log was reset (worker restarted)
+            viewer.innerHTML = '';
+            d.logs.forEach(line => {
+              const div = document.createElement('div');
+              div.className = 'log-line ' + classifyLog(line);
+              div.textContent = line;
+              viewer.appendChild(div);
+            });
+          } else {
+            newLines.forEach(line => {
+              const div = document.createElement('div');
+              div.className = 'log-line ' + classifyLog(line);
+              div.textContent = line;
+              viewer.appendChild(div);
+            });
+          }
+          prevLogCount = d.logs.length;
+          // Keep scrolled to bottom if user hasn't scrolled up
+          const atBottom = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 50;
+          if (atBottom) viewer.scrollTop = viewer.scrollHeight;
+        }
+      } catch(e) {}
+    }
+
+    // Initialize log count from server-rendered content
+    if (lv) prevLogCount = lv.querySelectorAll('.log-line').length;
+
+    setInterval(refresh, 3000);
     {% endif %}
   </script>
 </body>

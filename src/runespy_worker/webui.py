@@ -250,7 +250,8 @@ def stop_worker():
 @app.route("/api/stats")
 def api_stats():
     stats = _read_stats() or {}
-    stats["logs"] = _read_logs()[-50:]
+    stats["logs"] = _read_logs()
+    stats["is_running"] = _is_running()
     return stats
 
 
