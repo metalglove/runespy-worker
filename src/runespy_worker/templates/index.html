@@ -30,8 +30,6 @@
       min-height: 100vh;
     }
     .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
-
-    /* Header */
     .header {
       display: flex;
       align-items: center;
@@ -47,14 +45,11 @@
       border-radius: 12px;
       font-weight: 500;
     }
-
-    /* Status badges */
     .badge-running { background: var(--green-dim); color: var(--green); }
     .badge-connecting, .badge-reconnecting { background: var(--yellow-dim); color: var(--yellow); }
     .badge-stopped, .badge-error { background: var(--red-dim); color: var(--red); }
     .badge-starting, .badge-authenticated { background: var(--accent-dim); color: var(--accent); }
 
-    /* Tabs */
     .tabs {
       display: flex;
       gap: 0;
@@ -80,7 +75,6 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
-    /* Cards */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -97,7 +91,6 @@
       margin-bottom: 16px;
     }
 
-    /* Stepper */
     .step { position: relative; }
     .step.done .step-header { color: var(--text-dim); }
     .step.done .step-num { background: var(--green-dim); color: var(--green); }
@@ -111,10 +104,14 @@
       margin-bottom: 12px;
     }
     .step-num {
-      width: 26px; height: 26px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
       flex-shrink: 0;
       background: var(--surface2);
       color: var(--text-dim);
@@ -123,7 +120,6 @@
     .step-body { padding-left: 36px; margin-bottom: 8px; }
     .step-check { color: var(--green); }
 
-    /* Forms */
     input[type="text"], textarea {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -138,11 +134,20 @@
       outline: none;
       border-color: var(--accent);
     }
-    textarea { resize: vertical; min-height: 60px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
-    label { font-size: 13px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+    }
+    label {
+      font-size: 13px;
+      color: var(--text-dim);
+      display: block;
+      margin-bottom: 4px;
+    }
     .field { margin-bottom: 12px; }
 
-    /* Buttons */
     button, .btn {
       background: var(--accent);
       color: #fff;
@@ -161,9 +166,8 @@
     .btn-danger { background: var(--red-dim); color: var(--red); }
     .btn-success { background: var(--green-dim); color: var(--green); }
     .btn-secondary { background: var(--surface2); color: var(--text-dim); }
-    .btn-group { display: flex; gap: 8px; align-items: center; }
+    .btn-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-    /* Stats grid */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -173,11 +177,25 @@
       background: var(--surface2);
       border-radius: 6px;
       padding: 14px;
+      min-height: 104px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
     }
-    .stat-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .stat-label { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: auto;
+      padding-top: 8px;
+    }
 
-    /* Config display */
     .config-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -192,9 +210,11 @@
       font-size: 13px;
     }
     .config-key { color: var(--text-dim); }
-    .config-val { font-weight: 500; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .config-val {
+      font-weight: 500;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
 
-    /* Log viewer */
     .log-viewer {
       background: #0a0c10;
       border: 1px solid var(--border);
@@ -215,7 +235,6 @@
     .log-line.log-warning { color: var(--yellow); }
     .log-line.log-info-highlight { color: var(--green); }
 
-    /* Info text */
     .info { font-size: 13px; color: var(--text-dim); }
     .info code {
       background: var(--surface2);
@@ -225,7 +244,6 @@
       font-family: 'SF Mono', 'Fira Code', monospace;
     }
 
-    /* Flash messages */
     .flash {
       padding: 10px 14px;
       border-radius: 6px;
@@ -235,7 +253,6 @@
     .flash-error { background: var(--red-dim); color: var(--red); }
     .flash-success { background: var(--green-dim); color: var(--green); }
 
-    /* Section divider */
     .section-divider {
       font-size: 11px;
       color: var(--text-dim);
@@ -255,7 +272,6 @@
     .section-divider::before { left: 0; }
     .section-divider::after { right: 0; }
 
-    /* Utility */
     .mt-8 { margin-top: 8px; }
     .mt-16 { margin-top: 16px; }
     .mb-8 { margin-bottom: 8px; }
@@ -275,10 +291,7 @@
       <div class="flash flash-success">{{ flash_success }}</div>
     {% endif %}
 
-    {# ── Show setup flow if not fully registered ── #}
     {% if not has_secret %}
-
-      {# ── Step 1: Register ── #}
       <div class="card step {{ 'done' if worker_id else 'active' }}">
         <div class="step-header">
           <div class="step-num">{% if worker_id %}<span class="step-check">&#10003;</span>{% else %}1{% endif %}</div>
@@ -301,7 +314,6 @@
         </div>
       </div>
 
-      {# ── Step 2: Save secret ── #}
       <div class="card step {{ 'active' if worker_id else 'locked' }}">
         <div class="step-header">
           <div class="step-num">2</div>
@@ -322,19 +334,13 @@
           {% endif %}
         </div>
       </div>
-
     {% else %}
-
-      {# ── Fully registered: show tabs ── #}
       <div class="tabs">
         <button class="tab active" data-tab="dashboard">Dashboard</button>
         <button class="tab" data-tab="settings">Settings</button>
       </div>
 
-      {# ── Dashboard tab ── #}
       <div class="tab-panel active" id="tab-dashboard">
-
-        {# ── Worker controls ── #}
         <div class="card">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
@@ -351,7 +357,6 @@
           </div>
         </div>
 
-        {# ── Stats ── #}
         {% if stats %}
         <div class="card">
           <h2>Statistics</h2>
@@ -360,26 +365,54 @@
               <div class="stat-value" id="stat-completed">{{ stats.stats.completed }}</div>
               <div class="stat-label">Tasks completed</div>
             </div>
+
             <div class="stat-card">
               <div class="stat-value" id="stat-failed">{{ stats.stats.failed }}</div>
               <div class="stat-label">Tasks failed</div>
             </div>
+
             <div class="stat-card">
               <div class="stat-value" id="stat-batches-recv">{{ stats.stats.batches_received }}</div>
               <div class="stat-label">Batches received</div>
             </div>
+
             <div class="stat-card">
               <div class="stat-value" id="stat-batches-sent">{{ stats.stats.batches_sent }}</div>
               <div class="stat-label">Batches sent</div>
             </div>
+
             <div class="stat-card">
               <div class="stat-value" id="stat-uptime">{{ uptime_display }}</div>
               <div class="stat-label">Uptime</div>
             </div>
+
             <div class="stat-card">
-              <div class="stat-value" id="stat-proxies">{{ stats.proxy_count }}</div>
+              <div class="stat-value" id="stat-proxies">{{ proxy_count or 0 }}</div>
               <div class="stat-label">Proxies</div>
             </div>
+
+            {% if webshare_api_key and proxy_stats %}
+            <div class="stat-card">
+              <div class="stat-value" id="stat-bandwidth-current">{{ proxy_stats.bandwidth_total_human }}</div>
+              <div class="stat-label">Current Bandwidth</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="stat-bandwidth-projected">{{ proxy_stats.bandwidth_projected_human }}</div>
+              <div class="stat-label">Projected Bandwidth</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="stat-bandwidth-limit">
+                {% if proxy_stats.bandwidth_limit_human and proxy_stats.bandwidth_limit_human != '—' %}
+                  {{ proxy_stats.bandwidth_limit_human }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+              <div class="stat-label">Bandwidth Limit</div>
+            </div>
+            {% endif %}
           </div>
 
           <h2 class="mt-16">Server config</h2>
@@ -400,7 +433,6 @@
         </div>
         {% endif %}
 
-        {# ── Logs ── #}
         {% if logs %}
         <div class="card">
           <h2>Recent logs</h2>
@@ -413,10 +445,7 @@
         {% endif %}
       </div>
 
-      {# ── Settings tab ── #}
       <div class="tab-panel" id="tab-settings">
-
-        {# ── Proxy configuration ── #}
         <div class="card">
           <h2>Proxy configuration</h2>
           <p class="info mb-8">Route API requests through proxies for higher throughput. The master scales your rate limits based on proxy count. Leave both empty to fetch directly.</p>
@@ -433,7 +462,7 @@
             <div class="btn-group">
               <button type="submit">Save</button>
               {% if webshare_api_key or proxy_url %}
-                <span class="info">Active: <code>{{ 'Webshare (' + proxy_count|string + ' proxies)' if webshare_api_key else proxy_url }}</code></span>
+                <span class="info">Active: <code>{{ 'Webshare (' ~ (proxy_count or 0) ~ ' proxies)' if webshare_api_key else proxy_url }}</code></span>
               {% else %}
                 <span class="info">No proxy configured — fetching directly.</span>
               {% endif %}
@@ -441,7 +470,6 @@
           </form>
         </div>
 
-        {# ── Worker info ── #}
         <div class="card">
           <h2>Worker identity</h2>
           <div class="config-grid">
@@ -462,24 +490,20 @@
           </div>
         </div>
       </div>
-
     {% endif %}
   </div>
 
   <script>
-    // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-        // Persist tab choice
         history.replaceState(null, '', '?tab=' + tab.dataset.tab);
       });
     });
 
-    // Restore tab from URL
     const params = new URLSearchParams(location.search);
     const activeTab = params.get('tab');
     if (activeTab) {
@@ -491,16 +515,14 @@
       });
     }
 
-    // Auto-scroll log viewer to bottom
     const lv = document.getElementById('log-viewer');
     if (lv) lv.scrollTop = lv.scrollHeight;
 
-    // Live updates via /api/stats
     {% if has_secret %}
     function formatUptime(s) {
       if (s < 60) return s + 's';
-      if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
-      return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+      if (s < 3600) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+      return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
     }
 
     function classifyLog(line) {
@@ -518,7 +540,6 @@
         const d = await res.json();
         if (!d.stats) return;
 
-        // Status badge
         const badge = document.getElementById('status-badge');
         if (badge) {
           const status = d.status || (d.is_running ? 'running' : 'stopped');
@@ -526,30 +547,674 @@
           badge.className = 'badge badge-' + status;
         }
 
-        // Stats
         const el = (id) => document.getElementById(id);
-        if (el('stat-completed')) el('stat-completed').textContent = d.stats.completed;
-        if (el('stat-failed')) el('stat-failed').textContent = d.stats.failed;
-        if (el('stat-batches-recv')) el('stat-batches-recv').textContent = d.stats.batches_received;
-        if (el('stat-batches-sent')) el('stat-batches-sent').textContent = d.stats.batches_sent;
+
+        if (el('stat-completed')) el('stat-completed').textContent = d.stats.completed ?? 0;
+        if (el('stat-failed')) el('stat-failed').textContent = d.stats.failed ?? 0;
+        if (el('stat-batches-recv')) el('stat-batches-recv').textContent = d.stats.batches_received ?? 0;
+        if (el('stat-batches-sent')) el('stat-batches-sent').textContent = d.stats.batches_sent ?? 0;
         if (el('stat-uptime')) el('stat-uptime').textContent = formatUptime(d.uptime || 0);
         if (el('stat-proxies')) el('stat-proxies').textContent = d.proxy_count || 0;
 
-        // Config
+        if (el('stat-bandwidth-current') && d.proxyStats) {
+          el('stat-bandwidth-current').textContent = d.proxyStats.bandwidthTotalHuman;
+        }
+        if (el('stat-bandwidth-projected') && d.proxyStats) {
+          el('stat-bandwidth-projected').textContent = d.proxyStats.bandwidthProjectedHuman;
+        }
+        if (el('stat-bandwidth-limit') && d.proxyStats) {
+          el('stat-bandwidth-limit').textContent =
+            d.proxyStats.bandwidthLimitHuman && d.proxyStats.bandwidthLimitHuman !== '—'
+              ? d.proxyStats.bandwidthLimitHuman
+              : '—';
+        }
+
+        if (d.config) {
+          if (el('cfg-rate')) el('cfg-rate').textContent = (d.config.rate_limit_per_hour || '—') + '/hr';
+          if (el('cfg-delay')) el('cfg-delay').textContent = (d.config.fetch_delay || '—') + 's';
+          if (el('cfg-concurrent')) el('cfg-concurrent').textContent = d.config.max_concurrent || '—';
+        }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RuneSpy Worker</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232733;
+      --border: #2e3344;
+      --text: #e1e4ed;
+      --text-dim: #8b8fa3;
+      --accent: #6c8aff;
+      --accent-dim: #4a5e99;
+      --green: #4ade80;
+      --green-dim: #166534;
+      --red: #f87171;
+      --red-dim: #7f1d1d;
+      --yellow: #fbbf24;
+      --yellow-dim: #713f12;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    .badge-running { background: var(--green-dim); color: var(--green); }
+    .badge-connecting, .badge-reconnecting { background: var(--yellow-dim); color: var(--yellow); }
+    .badge-stopped, .badge-error { background: var(--red-dim); color: var(--red); }
+    .badge-starting, .badge-authenticated { background: var(--accent-dim); color: var(--accent); }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    .step { position: relative; }
+    .step.done .step-header { color: var(--text-dim); }
+    .step.done .step-num { background: var(--green-dim); color: var(--green); }
+    .step.active .step-num { background: var(--accent); color: #fff; }
+    .step.locked .step-header { color: var(--text-dim); opacity: 0.5; }
+    .step.locked .step-num { background: var(--surface2); color: var(--text-dim); }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+      background: var(--surface2);
+      color: var(--text-dim);
+    }
+    .step-title { font-size: 15px; font-weight: 500; }
+    .step-body { padding-left: 36px; margin-bottom: 8px; }
+    .step-check { color: var(--green); }
+
+    input[type="text"], textarea {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      width: 100%;
+    }
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+    }
+    label {
+      font-size: 13px;
+      color: var(--text-dim);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .field { margin-bottom: 12px; }
+
+    button, .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-danger { background: var(--red-dim); color: var(--red); }
+    .btn-success { background: var(--green-dim); color: var(--green); }
+    .btn-secondary { background: var(--surface2); color: var(--text-dim); }
+    .btn-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--surface2);
+      border-radius: 6px;
+      padding: 14px;
+      min-height: 104px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .stat-card-tooltip {
+      position: relative;
+    }
+    .stat-card-tooltip[data-tooltip] {
+      cursor: help;
+    }
+    .stat-card-tooltip[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 14px;
+      bottom: calc(100% + 8px);
+      background: #0a0c10;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: nowrap;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      transform: translateY(4px);
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 20;
+    }
+    .stat-card-tooltip[data-tooltip]::before {
+      content: "";
+      position: absolute;
+      left: 22px;
+      bottom: 100%;
+      width: 10px;
+      height: 10px;
+      background: #0a0c10;
+      border-left: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      transform: translateY(13px) rotate(45deg);
+      opacity: 0;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 19;
+    }
+    .stat-card-tooltip[data-tooltip]:hover::after,
+    .stat-card-tooltip[data-tooltip]:hover::before,
+    .stat-card-tooltip[data-tooltip]:focus-visible::after,
+    .stat-card-tooltip[data-tooltip]:focus-visible::before {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+    .config-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .config-key { color: var(--text-dim); }
+    .config-val {
+      font-weight: 500;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    .log-viewer {
+      background: #0a0c10;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      max-height: 350px;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+    .log-viewer::-webkit-scrollbar { width: 6px; }
+    .log-viewer::-webkit-scrollbar-track { background: transparent; }
+    .log-viewer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .log-line { white-space: pre-wrap; word-break: break-all; }
+    .log-line.log-error { color: var(--red); }
+    .log-line.log-warning { color: var(--yellow); }
+    .log-line.log-info-highlight { color: var(--green); }
+
+    .info { font-size: 13px; color: var(--text-dim); }
+    .info code {
+      background: var(--surface2);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    .flash {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    .flash-error { background: var(--red-dim); color: var(--red); }
+    .flash-success { background: var(--green-dim); color: var(--green); }
+
+    .section-divider {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      margin: 8px 0 12px;
+      position: relative;
+    }
+    .section-divider::before,
+    .section-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: var(--border);
+    }
+    .section-divider::before { left: 0; }
+    .section-divider::after { right: 0; }
+
+    .mt-8 { margin-top: 8px; }
+    .mt-16 { margin-top: 16px; }
+    .mb-8 { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>RuneSpy Worker</h1>
+      <span class="badge badge-{{ worker_status or 'stopped' }}" id="status-badge">{{ worker_status or 'not running' }}</span>
+    </div>
+
+    {% if flash_error %}
+      <div class="flash flash-error">{{ flash_error }}</div>
+    {% endif %}
+    {% if flash_success %}
+      <div class="flash flash-success">{{ flash_success }}</div>
+    {% endif %}
+
+    {% if not has_secret %}
+      <div class="card step {{ 'done' if worker_id else 'active' }}">
+        <div class="step-header">
+          <div class="step-num">{% if worker_id %}<span class="step-check">&#10003;</span>{% else %}1{% endif %}</div>
+          <span class="step-title">Register worker</span>
+        </div>
+        <div class="step-body">
+          {% if worker_id %}
+            <p class="info">Registered as <code>{{ worker_id }}</code></p>
+            {% if worker_name %}<p class="info">Name: <code>{{ worker_name }}</code></p>{% endif %}
+          {% else %}
+            <form method="post" action="/register">
+              <div class="field">
+                <label>Worker name</label>
+                <input type="text" name="name" placeholder="my-macbook" required>
+              </div>
+              <button type="submit">Register with master</button>
+            </form>
+            <p class="info mt-8">This generates an Ed25519 keypair and registers with the master server.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card step {{ 'active' if worker_id else 'locked' }}">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <span class="step-title">Save shared secret</span>
+        </div>
+        <div class="step-body">
+          {% if worker_id %}
+            <p class="info mb-8">Share your worker ID with the RuneSpy admin. Once approved, paste the encrypted secret below.</p>
+            <form method="post" action="/save-secret">
+              <div class="field">
+                <label>Encrypted secret (base64)</label>
+                <textarea name="encrypted" placeholder="Paste the base64 blob from the admin here..." required></textarea>
+              </div>
+              <button type="submit">Save secret</button>
+            </form>
+          {% else %}
+            <p class="info">Register first to get a worker ID.</p>
+          {% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-dashboard">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <p class="info">Worker <code>{{ worker_id }}</code>{% if worker_name %} ({{ worker_name }}){% endif %}</p>
+            </div>
+            <div class="btn-group">
+              {% if is_running %}
+                <form method="post" action="/restart-worker"><button type="submit" class="btn-secondary">Restart</button></form>
+                <form method="post" action="/stop-worker"><button type="submit" class="btn-danger">Stop</button></form>
+              {% else %}
+                <form method="post" action="/run-worker"><button type="submit" class="btn-success">Start worker</button></form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if stats %}
+        <div class="card">
+          <h2>Statistics</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value" id="stat-completed">{{ stats.stats.completed }}</div>
+              <div class="stat-label">Tasks completed</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="stat-failed">{{ stats.stats.failed }}</div>
+              <div class="stat-label">Tasks failed</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="stat-batches-recv">{{ stats.stats.batches_received }}</div>
+              <div class="stat-label">Batches received</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="stat-batches-sent">{{ stats.stats.batches_sent }}</div>
+              <div class="stat-label">Batches sent</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="stat-uptime">{{ uptime_display }}</div>
+              <div class="stat-label">Uptime</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-value" id="stat-proxies">{{ proxy_count or 0 }}</div>
+              <div class="stat-label">Proxies</div>
+            </div>
+
+            {% if webshare_api_key and proxy_stats %}
+            <div class="stat-card">
+              <div class="stat-value" id="stat-bandwidth-current">{{ proxy_stats.bandwidth_total_human }}</div>
+              <div class="stat-label">Current Bandwidth</div>
+            </div>
+
+            <div
+              class="stat-card stat-card-tooltip"
+              id="stat-bandwidth-projected-card"
+              {% if proxy_stats.bandwidth_limit_human and proxy_stats.bandwidth_limit_human != '—' %}
+                tabindex="0"
+                data-tooltip="Bandwidth limit: {{ proxy_stats.bandwidth_limit_human }}"
+                aria-label="Projected bandwidth. Bandwidth limit: {{ proxy_stats.bandwidth_limit_human }}"
+              {% endif %}
+            >
+              <div class="stat-value" id="stat-bandwidth-projected">{{ proxy_stats.bandwidth_projected_human }}</div>
+              <div class="stat-label">Projected Bandwidth</div>
+            </div>
+            {% endif %}
+          </div>
+
+          <h2 class="mt-16">Server config</h2>
+          <div class="config-grid">
+            <div class="config-item">
+              <span class="config-key">Rate limit</span>
+              <span class="config-val" id="cfg-rate">{{ stats.config.rate_limit_per_hour if stats.config else '—' }}/hr</span>
+            </div>
+            <div class="config-item">
+              <span class="config-key">Fetch delay</span>
+              <span class="config-val" id="cfg-delay">{{ stats.config.fetch_delay if stats.config else '—' }}s</span>
+            </div>
+            <div class="config-item">
+              <span class="config-key">Concurrency</span>
+              <span class="config-val" id="cfg-concurrent">{{ stats.config.max_concurrent if stats.config else '—' }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if logs %}
+        <div class="card">
+          <h2>Recent logs</h2>
+          <div class="log-viewer" id="log-viewer">
+            {% for line in logs %}
+              <div class="log-line {{ 'log-error' if '[ERROR]' in line or ('[WARNING]' in line and 'Failed' in line) else ('log-warning' if '[WARNING]' in line else ('log-info-highlight' if 'Fetched' in line or 'Batch sent' in line or 'Authenticated' in line else '')) }}">{{ line }}</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="tab-panel" id="tab-settings">
+        <div class="card">
+          <h2>Proxy configuration</h2>
+          <p class="info mb-8">Route API requests through proxies for higher throughput. The master scales your rate limits based on proxy count. Leave both empty to fetch directly.</p>
+          <form method="post" action="/save-proxy-config">
+            <div class="field">
+              <label>Webshare API key</label>
+              <input type="text" name="webshare_api_key" value="{{ webshare_api_key or '' }}" placeholder="your-webshare-api-key">
+            </div>
+            <div class="section-divider">or</div>
+            <div class="field">
+              <label>Single proxy URL</label>
+              <input type="text" name="proxy_url" value="{{ proxy_url or '' }}" placeholder="http://user:pass@host:port">
+            </div>
+            <div class="btn-group">
+              <button type="submit">Save</button>
+              {% if webshare_api_key or proxy_url %}
+                <span class="info">Active: <code>{{ 'Webshare (' ~ (proxy_count or 0) ~ ' proxies)' if webshare_api_key else proxy_url }}</code></span>
+              {% else %}
+                <span class="info">No proxy configured — fetching directly.</span>
+              {% endif %}
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>Worker identity</h2>
+          <div class="config-grid">
+            <div class="config-item">
+              <span class="config-key">Worker ID</span>
+              <span class="config-val">{{ worker_id[:12] }}...</span>
+            </div>
+            {% if worker_name %}
+            <div class="config-item">
+              <span class="config-key">Name</span>
+              <span class="config-val">{{ worker_name }}</span>
+            </div>
+            {% endif %}
+            <div class="config-item">
+              <span class="config-key">Secret</span>
+              <span class="config-val" style="color: var(--green);">saved</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <script>
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        history.replaceState(null, '', '?tab=' + tab.dataset.tab);
+      });
+    });
+
+    const params = new URLSearchParams(location.search);
+    const activeTab = params.get('tab');
+    if (activeTab) {
+      document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === activeTab);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => {
+        p.classList.toggle('active', p.id === 'tab-' + activeTab);
+      });
+    }
+
+    const lv = document.getElementById('log-viewer');
+    if (lv) lv.scrollTop = lv.scrollHeight;
+
+    {% if has_secret %}
+    function formatUptime(s) {
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+      return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+    }
+
+    function classifyLog(line) {
+      if (line.includes('[ERROR]') || (line.includes('[WARNING]') && line.includes('Failed'))) return 'log-error';
+      if (line.includes('[WARNING]')) return 'log-warning';
+      if (line.includes('Fetched') || line.includes('Batch sent') || line.includes('Authenticated')) return 'log-info-highlight';
+      return '';
+    }
+
+    let prevLogCount = 0;
+
+    async function refresh() {
+      try {
+        const res = await fetch('/api/stats');
+        const d = await res.json();
+        if (!d.stats) return;
+
+        const badge = document.getElementById('status-badge');
+        if (badge) {
+          const status = d.status || (d.is_running ? 'running' : 'stopped');
+          badge.textContent = status;
+          badge.className = 'badge badge-' + status;
+        }
+
+        const el = (id) => document.getElementById(id);
+
+        if (el('stat-completed')) el('stat-completed').textContent = d.stats.completed ?? 0;
+        if (el('stat-failed')) el('stat-failed').textContent = d.stats.failed ?? 0;
+        if (el('stat-batches-recv')) el('stat-batches-recv').textContent = d.stats.batches_received ?? 0;
+        if (el('stat-batches-sent')) el('stat-batches-sent').textContent = d.stats.batches_sent ?? 0;
+        if (el('stat-uptime')) el('stat-uptime').textContent = formatUptime(d.uptime || 0);
+        if (el('stat-proxies')) el('stat-proxies').textContent = d.proxy_count || 0;
+
+        if (el('stat-bandwidth-current') && d.proxyStats) {
+          el('stat-bandwidth-current').textContent = d.proxyStats.bandwidthTotalHuman;
+        }
+
+        if (el('stat-bandwidth-projected') && d.proxyStats) {
+          el('stat-bandwidth-projected').textContent = d.proxyStats.bandwidthProjectedHuman;
+
+          const projectedCard = document.getElementById('stat-bandwidth-projected-card');
+          if (projectedCard) {
+            const limitText =
+              d.proxyStats.bandwidthLimitHuman && d.proxyStats.bandwidthLimitHuman !== '—'
+                ? `Bandwidth limit: ${d.proxyStats.bandwidthLimitHuman}`
+                : '';
+
+            if (limitText) {
+              projectedCard.setAttribute('data-tooltip', limitText);
+              projectedCard.setAttribute('aria-label', `Projected bandwidth. ${limitText}`);
+              projectedCard.setAttribute('tabindex', '0');
+            } else {
+              projectedCard.removeAttribute('data-tooltip');
+              projectedCard.removeAttribute('aria-label');
+              projectedCard.removeAttribute('tabindex');
+            }
+          }
+        }
+
         if (d.config) {
           if (el('cfg-rate')) el('cfg-rate').textContent = (d.config.rate_limit_per_hour || '—') + '/hr';
           if (el('cfg-delay')) el('cfg-delay').textContent = (d.config.fetch_delay || '—') + 's';
           if (el('cfg-concurrent')) el('cfg-concurrent').textContent = d.config.max_concurrent || '—';
         }
 
-        // Logs — append only new lines
         const viewer = document.getElementById('log-viewer');
         if (viewer && d.logs) {
-          // Check scroll position BEFORE appending
           const atBottom = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 50;
 
           if (d.logs.length < prevLogCount) {
-            // Log was reset (worker restarted)
             viewer.innerHTML = '';
             d.logs.forEach(line => {
               const div = document.createElement('div');
@@ -565,15 +1230,51 @@
               viewer.appendChild(div);
             });
           }
+
           prevLogCount = d.logs.length;
           if (atBottom) viewer.scrollTop = viewer.scrollHeight;
         }
-      } catch(e) {}
+      } catch (e) {
+        console.error('refresh failed', e);
+      }
     }
 
-    // Initialize log count from server-rendered content
     if (lv) prevLogCount = lv.querySelectorAll('.log-line').length;
+    setInterval(refresh, 3000);
+    {% endif %}
+  </script>
+</body>
+</html>
+        const viewer = document.getElementById('log-viewer');
+        if (viewer && d.logs) {
+          const atBottom = viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 50;
 
+          if (d.logs.length < prevLogCount) {
+            viewer.innerHTML = '';
+            d.logs.forEach(line => {
+              const div = document.createElement('div');
+              div.className = 'log-line ' + classifyLog(line);
+              div.textContent = line;
+              viewer.appendChild(div);
+            });
+          } else if (d.logs.length > prevLogCount) {
+            d.logs.slice(prevLogCount).forEach(line => {
+              const div = document.createElement('div');
+              div.className = 'log-line ' + classifyLog(line);
+              div.textContent = line;
+              viewer.appendChild(div);
+            });
+          }
+
+          prevLogCount = d.logs.length;
+          if (atBottom) viewer.scrollTop = viewer.scrollHeight;
+        }
+      } catch (e) {
+        console.error('refresh failed', e);
+      }
+    }
+
+    if (lv) prevLogCount = lv.querySelectorAll('.log-line').length;
     setInterval(refresh, 3000);
     {% endif %}
   </script>

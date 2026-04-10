@@ -10,20 +10,16 @@ import threading
 from pathlib import Path
 from subprocess import CalledProcessError, Popen, run
 
-from flask import Flask, redirect, render_template, request, url_for
+import requests
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 app = Flask(__name__)
 RUNE_HOME = Path.home() / ".runespy"
 MASTER_URL = "wss://runespy.com"
 
-# Worker subprocess handle (guarded by _proc_lock for thread safety)
 _worker_proc: Popen | None = None
 _proc_lock = threading.Lock()
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _read_file(name: str) -> str | None:
     p = RUNE_HOME / name
@@ -35,7 +31,6 @@ def _has_file(name: str) -> bool:
 
 
 def _read_proxy_config() -> tuple[str | None, str | None]:
-    """Read saved proxy configuration."""
     webshare_key = _read_file("webshare_api_key")
     proxy_url = _read_file("proxy_url")
     return webshare_key, proxy_url
@@ -45,15 +40,16 @@ def _save_proxy_config(webshare_api_key: str | None, proxy_url: str | None):
     RUNE_HOME.mkdir(parents=True, exist_ok=True)
     key_path = RUNE_HOME / "webshare_api_key"
     url_path = RUNE_HOME / "proxy_url"
+
     if webshare_api_key:
-        key_path.write_text(webshare_api_key.strip())
-        url_path.unlink(missing_ok=True)
+      key_path.write_text(webshare_api_key.strip())
+      url_path.unlink(missing_ok=True)
     elif proxy_url:
-        url_path.write_text(proxy_url.strip())
-        key_path.unlink(missing_ok=True)
+      url_path.write_text(proxy_url.strip())
+      key_path.unlink(missing_ok=True)
     else:
-        key_path.unlink(missing_ok=True)
-        url_path.unlink(missing_ok=True)
+      key_path.unlink(missing_ok=True)
+      url_path.unlink(missing_ok=True)
 
 
 def _read_stats() -> dict | None:
@@ -84,6 +80,82 @@ def _format_uptime(seconds: int) -> str:
     h = seconds // 3600
     m = (seconds % 3600) // 60
     return f"{h}h {m}m"
+
+
+def _format_bytes(num: int | float | None) -> str:
+    units = ["B", "KB", "MB", "GB", "TB"]
+    value = float(num or 0)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(value)} B"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return "0 B"
+
+
+def _fetch_webshare_json(path: str) -> dict | None:
+    webshare_api_key, _ = _read_proxy_config()
+    if not webshare_api_key:
+        return None
+
+    try:
+        res = requests.get(
+            f"https://proxy.webshare.io/api/v2/{path}",
+            headers={"Authorization": f"Token {webshare_api_key}"},
+            timeout=10,
+        )
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        print(f"Failed Webshare request for {path}: {e}")
+        return None
+
+
+def _fetch_webshare_stats() -> dict | None:
+    webshare_api_key, _ = _read_proxy_config()
+    if not webshare_api_key:
+        return None
+
+    aggregate = _fetch_webshare_json("stats/aggregate/")
+    if not aggregate:
+        return None
+
+    bandwidth_total = aggregate.get("bandwidth_total", 0)
+    bandwidth_projected = aggregate.get("bandwidth_projected", 0)
+
+    bandwidth_limit_gb = None
+    bandwidth_limit_human = "—"
+
+    subscription = _fetch_webshare_json("subscription/")
+    if subscription:
+        plan_info = subscription.get("plan")
+        plan_id = None
+
+        if isinstance(plan_info, dict):
+            plan_id = plan_info.get("id")
+        elif isinstance(plan_info, int):
+            plan_id = plan_info
+        else:
+            plan_id = subscription.get("plan_id")
+
+        if plan_id:
+            plan = _fetch_webshare_json(f"subscription/plan/{plan_id}/")
+            if plan:
+                bandwidth_limit_gb = plan.get("bandwidth_limit")
+                if bandwidth_limit_gb == 0:
+                    bandwidth_limit_human = "Unlimited"
+                elif bandwidth_limit_gb is not None:
+                    bandwidth_limit_human = f"{bandwidth_limit_gb:g} GB"
+
+    return {
+        "bandwidth_total": bandwidth_total,
+        "bandwidth_projected": bandwidth_projected,
+        "bandwidth_total_human": _format_bytes(bandwidth_total),
+        "bandwidth_projected_human": _format_bytes(bandwidth_projected),
+        "bandwidth_limit_gb": bandwidth_limit_gb,
+        "bandwidth_limit_human": bandwidth_limit_human,
+    }
 
 
 def _is_running() -> bool:
@@ -128,10 +200,6 @@ def _stop_worker():
         _worker_proc = None
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
 @app.route("/")
 def index():
     worker_id = _read_file("worker_id")
@@ -142,10 +210,12 @@ def index():
     stats = _read_stats()
     logs = _read_logs()
     webshare_api_key, proxy_url = _read_proxy_config()
+    proxy_stats = _fetch_webshare_stats()
 
     worker_status = None
     uptime_display = "0s"
     proxy_count = 0
+
     if stats:
         worker_status = stats.get("status")
         uptime_display = _format_uptime(stats.get("uptime", 0))
@@ -156,7 +226,8 @@ def index():
     flash_error = request.args.get("error")
     flash_success = request.args.get("success")
 
-    return render_template("index.html",
+    return render_template(
+        "index.html",
         worker_id=worker_id,
         worker_name=worker_name,
         has_secret=has_secret,
@@ -168,6 +239,7 @@ def index():
         webshare_api_key=webshare_api_key,
         proxy_url=proxy_url,
         proxy_count=proxy_count,
+        proxy_stats=proxy_stats,
         flash_error=flash_error,
         flash_success=flash_success,
     )
@@ -179,7 +251,6 @@ def register():
     if not name:
         name = socket.gethostname()
 
-    # Persist name
     RUNE_HOME.mkdir(parents=True, exist_ok=True)
     (RUNE_HOME / "worker_name").write_text(name)
 
@@ -218,7 +289,13 @@ def save_proxy_config():
     proxy_url = request.form.get("proxy_url", "").strip() or None
 
     if webshare_key and proxy_url:
-        return redirect(url_for("index", error="Choose either Webshare API key or a single proxy URL, not both.", tab="settings"))
+        return redirect(
+            url_for(
+                "index",
+                error="Choose either Webshare API key or a single proxy URL, not both.",
+                tab="settings",
+            )
+        )
 
     _save_proxy_config(webshare_key, proxy_url)
 
@@ -253,33 +330,34 @@ def stop_worker():
     return redirect(url_for("index", success="Worker stopped."))
 
 
-# ---------------------------------------------------------------------------
-# JSON API for programmatic access
-# ---------------------------------------------------------------------------
-
 @app.route("/api/stats")
 def api_stats():
     stats = _read_stats() or {}
-    stats["logs"] = _read_logs()
-    stats["is_running"] = _is_running()
-    return stats
+    proxy_stats = _fetch_webshare_stats()
 
+    response = dict(stats)
+    response["logs"] = _read_logs()
+    response["is_running"] = _is_running()
 
-# ---------------------------------------------------------------------------
-# Entrypoint
-# ---------------------------------------------------------------------------
+    if proxy_stats:
+        response["proxyStats"] = {
+            "bandwidthTotalHuman": proxy_stats["bandwidth_total_human"],
+            "bandwidthProjectedHuman": proxy_stats["bandwidth_projected_human"],
+            "bandwidthLimitHuman": proxy_stats["bandwidth_limit_human"],
+        }
+
+    return jsonify(response)
+
 
 def main():
     import os
 
-    # Seed proxy config from env vars if not already saved
     if not _read_file("webshare_api_key") and not _read_file("proxy_url"):
         env_key = os.environ.get("WEBSHARE_API_KEY")
         env_proxy = os.environ.get("PROXY_URL")
         if env_key or env_proxy:
             _save_proxy_config(env_key, env_proxy)
 
-    # Auto-start worker if credentials are present
     if _has_file("worker_secret.key"):
         _start_worker()
 
