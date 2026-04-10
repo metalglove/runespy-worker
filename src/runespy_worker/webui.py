@@ -270,6 +270,15 @@ def api_stats():
 # ---------------------------------------------------------------------------
 
 def main():
+    import os
+
+    # Seed proxy config from env vars if not already saved
+    if not _read_file("webshare_api_key") and not _read_file("proxy_url"):
+        env_key = os.environ.get("WEBSHARE_API_KEY")
+        env_proxy = os.environ.get("PROXY_URL")
+        if env_key or env_proxy:
+            _save_proxy_config(env_key, env_proxy)
+
     # Auto-start worker if credentials are present
     if _has_file("worker_secret.key"):
         _start_worker()
