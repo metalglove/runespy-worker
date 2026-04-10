@@ -105,30 +105,36 @@ This shows whether your worker is `pending` or `approved`. It does **not** retri
 
 ---
 
-## Web UI (Docker)
+## Docker
 
-The built-in web UI provides a browser-based interface for registration, secret management, proxy configuration, and live monitoring. It wraps the same CLI commands behind a Flask app running inside Docker.
+A pre-built image is available on GitHub Container Registry — no need to clone or build anything.
 
-### Build
-
-```bash
-docker build -t runespy-worker .
-```
-
-### Run (web UI mode)
+### Quick start (web UI)
 
 ```bash
 docker run -d \
   -p 127.0.0.1:8080:8080 \
-  -v $HOME/.runespy:/root/.runespy \
+  -v ~/.runespy:/root/.runespy \
   --name runespy-worker \
   --restart unless-stopped \
-  runespy-worker
+  ghcr.io/metalglove/runespy-worker
 ```
 
-Open `http://localhost:8080` in your browser. The `~/.runespy` directory is bind-mounted so credentials persist across container restarts.
+Open `http://localhost:8080` to register, save your secret, configure proxies, and monitor the worker. The `~/.runespy` volume persists credentials across container restarts.
 
-### Run (headless mode)
+To add proxies, pass the Webshare API key as an environment variable:
+
+```bash
+docker run -d \
+  -p 127.0.0.1:8080:8080 \
+  -v ~/.runespy:/root/.runespy \
+  -e WEBSHARE_API_KEY="your-api-key" \
+  --name runespy-worker \
+  --restart unless-stopped \
+  ghcr.io/metalglove/runespy-worker
+```
+
+### Headless mode
 
 For pre-configured workers that don't need the web UI (e.g. servers), use the entrypoint script:
 
@@ -142,8 +148,20 @@ docker run -d \
   -e WEBSHARE_API_KEY="your-api-key" \
   --name runespy-worker \
   --restart unless-stopped \
-  runespy-worker
+  ghcr.io/metalglove/runespy-worker
 ```
+
+### Building locally
+
+If you prefer to build the image yourself:
+
+```bash
+git clone https://github.com/metalglove/runespy-worker.git
+cd runespy-worker
+docker build -t runespy-worker .
+```
+
+Then use `runespy-worker` instead of `ghcr.io/metalglove/runespy-worker` in the commands above.
 
 ### Web UI flow
 
@@ -267,19 +285,7 @@ The worker automatically fetches your proxy list from Webshare's API on startup 
 
 ### Docker with proxies
 
-Add the environment variable to your `docker run` command:
-
-```bash
-docker run -d \
-  -e WORKER_ID="$(cat ~/.runespy/worker_id)" \
-  -e WORKER_KEY_PEM_B64="$(base64 < ~/.runespy/worker_key.pem)" \
-  -e WORKER_SECRET_B64="$(base64 < ~/.runespy/worker_secret.key)" \
-  -e MASTER_URL="wss://runespy.com" \
-  -e WEBSHARE_API_KEY="your-api-key" \
-  --name runespy-worker \
-  --restart unless-stopped \
-  runespy-worker
-```
+Add the environment variable to your `docker run` command (see [Docker](#docker) section for full examples).
 
 ### Single proxy
 
