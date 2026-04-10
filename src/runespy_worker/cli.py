@@ -143,35 +143,47 @@ def run(master, max_concurrent, proxy_url, webshare_api_key):
     asyncio.run(client_run(master, max_concurrent=max_concurrent, proxy_urls=proxy_urls))
 
 
-def _fetch_webshare_proxies(api_key: str) -> list[str]:
+def _fetch_webshare_proxies(api_key: str, retries: int = 3) -> list[str]:
     """Fetch proxy list from Webshare API (synchronous, runs before event loop)."""
     import httpx as _httpx
 
-    proxies: list[str] = []
-    page = 1
-    while True:
-        try:
-            resp = _httpx.get(
-                "https://proxy.webshare.io/api/v2/proxy/list/",
-                params={"mode": "direct", "page": page, "page_size": 100},
-                headers={"Authorization": f"Token {api_key}"},
-                timeout=15,
-            )
-            resp.raise_for_status()
-        except _httpx.HTTPError as e:
-            click.echo(f"Webshare API error: {e}", err=True)
-            return []
+    for attempt in range(1, retries + 1):
+        proxies: list[str] = []
+        page = 1
+        failed = False
+        while True:
+            try:
+                resp = _httpx.get(
+                    "https://proxy.webshare.io/api/v2/proxy/list/",
+                    params={"mode": "direct", "page": page, "page_size": 100},
+                    headers={"Authorization": f"Token {api_key}"},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+            except _httpx.HTTPError as e:
+                click.echo(f"Webshare API error (attempt {attempt}/{retries}): {e}", err=True)
+                failed = True
+                break
 
-        data = resp.json()
-        for p in data.get("results", []):
-            url = f"http://{p['username']}:{p['password']}@{p['proxy_address']}:{p['port']}"
-            proxies.append(url)
+            data = resp.json()
+            for p in data.get("results", []):
+                url = f"http://{p['username']}:{p['password']}@{p['proxy_address']}:{p['port']}"
+                proxies.append(url)
 
-        if not data.get("next"):
-            break
-        page += 1
+            if not data.get("next"):
+                break
+            page += 1
 
-    return proxies
+        if not failed:
+            return proxies
+
+        if attempt < retries:
+            import time
+            delay = 5 * attempt
+            click.echo(f"Retrying in {delay}s...")
+            time.sleep(delay)
+
+    return []
 
 
 @main.command()
