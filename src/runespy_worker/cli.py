@@ -143,9 +143,12 @@ def run(master, max_concurrent, proxy_url, webshare_api_key):
             click.echo("Proxy check failed — falling back to direct (no proxy).", err=True)
             proxy_urls = []
 
+    # Pass API key so the worker can retry proxy fetch later if it fell back to direct
+    retry_api_key = webshare_api_key if webshare_api_key and not proxy_urls else None
+
     from runespy_worker.client import run as client_run
     click.echo("Starting worker...")
-    asyncio.run(client_run(master, max_concurrent=max_concurrent, proxy_urls=proxy_urls))
+    asyncio.run(client_run(master, max_concurrent=max_concurrent, proxy_urls=proxy_urls, webshare_api_key=retry_api_key))
 
 
 def _test_proxy(proxy_url: str) -> bool:

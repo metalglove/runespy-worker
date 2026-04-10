@@ -332,7 +332,51 @@ async def process_task(
         await asyncio.sleep(fetch_delay)
 
 
-async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | None = None):
+async def _proxy_retry_loop(
+    api_key: str,
+    proxy_state: dict,
+    ws,
+    worker_id: str,
+    secret: bytes,
+    max_concurrent: int,
+    interval: float = 1800.0,
+):
+    """Retry Webshare proxy fetch every *interval* seconds (default 30 min).
+
+    When proxies are recovered, updates *proxy_state* in-place and sends a new
+    ``ready`` message so the master can push scaled config.
+    """
+    from runespy_worker.cli import _fetch_webshare_proxies, _test_proxy
+
+    while True:
+        await asyncio.sleep(interval)
+        logger.info("Retrying Webshare proxy fetch...")
+
+        urls = await asyncio.to_thread(_fetch_webshare_proxies, api_key)
+        if not urls:
+            logger.warning("Proxy retry failed — will try again in %.0fm", interval / 60)
+            continue
+
+        if not await asyncio.to_thread(_test_proxy, urls[0]):
+            logger.warning("Proxy connectivity check failed — will try again in %.0fm", interval / 60)
+            continue
+
+        # Proxies recovered
+        proxy_state["urls"] = urls
+        proxy_state["cycle"] = itertools.cycle(urls)
+        _state["proxy_count"] = len(urls)
+        logger.info("\033[32mProxies recovered\033[0m — %d proxies active", len(urls))
+
+        ready_payload = {"capacity": max_concurrent, "has_proxy": True, "proxy_count": len(urls)}
+        ready_msg = build_message("ready", ready_payload, worker_id, secret)
+        try:
+            await ws.send(ready_msg)
+        except Exception:
+            pass
+        return  # done, proxies are live
+
+
+async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | None = None, webshare_api_key: str | None = None):
     """Connect to the master server and run the worker until interrupted.
 
     Loads credentials from ``~/.runespy/`` (worker_id, private key, shared
@@ -370,6 +414,9 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
             logger.info("Proxy: %s", masked)
         logger.info("Rotating across %d proxies", len(proxy_urls))
     _state["proxy_count"] = len(proxy_urls or [])
+
+    # Mutable container so the retry loop can update proxy state mid-connection
+    _proxy = {"cycle": proxy_cycle, "urls": proxy_urls or []}
 
     ws_url = f"{master_url}/api/workers/ws/connect?worker_id={worker_id}"
 
@@ -439,14 +486,14 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
 
                 # Send ready
                 ready_payload = {"capacity": max_concurrent}
-                if proxy_urls:
+                if _proxy["urls"]:
                     ready_payload["has_proxy"] = True
-                    ready_payload["proxy_count"] = len(proxy_urls)
+                    ready_payload["proxy_count"] = len(_proxy["urls"])
                 ready_msg = build_message("ready", ready_payload, worker_id, secret)
                 await ws.send(ready_msg)
                 _state["status"] = "running"
                 _write_stats()
-                logger.info("Sent ready (capacity=%d, proxies=%d) — waiting for tasks", max_concurrent, len(proxy_urls or []))
+                logger.info("Sent ready (capacity=%d, proxies=%d) — waiting for tasks", max_concurrent, len(_proxy["urls"]))
 
                 semaphore = asyncio.Semaphore(max_concurrent)
                 result_queue: asyncio.Queue = asyncio.Queue()
@@ -457,6 +504,13 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                 batch_task = asyncio.create_task(
                     batch_sender_loop(ws, result_queue, worker_id, secret)
                 )
+
+                # Retry proxy fetch in background if we fell back to direct
+                proxy_retry_task = None
+                if webshare_api_key and not _proxy["urls"]:
+                    proxy_retry_task = asyncio.create_task(
+                        _proxy_retry_loop(webshare_api_key, _proxy, ws, worker_id, secret, max_concurrent)
+                    )
 
                 try:
                     async for raw in ws:
@@ -476,7 +530,7 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                                 asyncio.create_task(
                                     process_task(
                                         result_queue, task, worker_id, secret,
-                                        proxy_cycle, semaphore, rate_limiter, fetch_delay,
+                                        _proxy["cycle"], semaphore, rate_limiter, fetch_delay,
                                     )
                                 )
 
@@ -504,9 +558,9 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                             )
                             # Acknowledge with updated capacity
                             ready_payload = {"capacity": max_concurrent}
-                            if proxy_urls:
+                            if _proxy["urls"]:
                                 ready_payload["has_proxy"] = True
-                                ready_payload["proxy_count"] = len(proxy_urls)
+                                ready_payload["proxy_count"] = len(_proxy["urls"])
                             ready_msg = build_message("ready", ready_payload, worker_id, secret)
                             await ws.send(ready_msg)
 
@@ -527,6 +581,8 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                 finally:
                     heartbeat_task.cancel()
                     batch_task.cancel()
+                    if proxy_retry_task:
+                        proxy_retry_task.cancel()
 
         except (websockets.ConnectionClosed, ConnectionRefusedError, OSError) as e:
             _state["status"] = "reconnecting"
