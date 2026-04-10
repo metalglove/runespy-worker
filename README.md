@@ -4,6 +4,23 @@ Distributed worker client for [RuneSpy](https://runespy.com) — a RuneScape pla
 
 Workers are volunteer-run processes that fetch player data from the RuneMetrics API on the tracker's behalf. The master server never fetches data itself; all API calls go through connected workers.
 
+## Quick start (Docker)
+
+The easiest way to run a worker — no Python or build tools needed:
+
+```bash
+docker run -d \
+  -p 127.0.0.1:8080:8080 \
+  -v ~/.runespy:/root/.runespy \
+  --name runespy-worker \
+  --restart unless-stopped \
+  ghcr.io/metalglove/runespy-worker
+```
+
+Open **http://localhost:8080** to register, get approved, and start tracking. See the [Docker](#docker) section for more options (proxies, headless mode).
+
+---
+
 ## How it works
 
 ```
