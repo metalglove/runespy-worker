@@ -7,10 +7,11 @@ files written by the worker process to display a live dashboard.
 import json
 import socket
 import threading
+import time
 from pathlib import Path
 from subprocess import CalledProcessError, Popen, run
 
-import requests
+import httpx
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 # --- App setup & global config ---
@@ -20,6 +21,12 @@ MASTER_URL = "wss://runespy.com"
 
 _worker_proc: Popen | None = None
 _proc_lock = threading.Lock()
+
+# Cache for Webshare stats to avoid hitting the API on every poll
+_webshare_stats_cache: dict | None = None
+_webshare_stats_cache_time: float = 0.0
+_WEBSHARE_STATS_TTL = 60.0  # seconds
+_webshare_stats_lock = threading.Lock()
 
 
 # --- File helpers (read/write local config/state) ---
@@ -107,19 +114,25 @@ def _fetch_webshare_json(path: str) -> dict | None:
         return None
 
     try:
-        res = requests.get(
+        res = httpx.get(
             f"https://proxy.webshare.io/api/v2/{path}",
             headers={"Authorization": f"Token {webshare_api_key}"},
             timeout=10,
         )
         res.raise_for_status()
         return res.json()
-    except Exception as e:
-        print(f"Failed Webshare request for {path}: {e}")
+    except Exception:
+        app.logger.exception("Failed Webshare request for %s", path)
         return None
 
 
 def _fetch_webshare_stats() -> dict | None:
+    global _webshare_stats_cache, _webshare_stats_cache_time
+    now = time.monotonic()
+    with _webshare_stats_lock:
+        if _webshare_stats_cache is not None and now - _webshare_stats_cache_time < _WEBSHARE_STATS_TTL:
+            return _webshare_stats_cache
+
     webshare_api_key, _ = _read_proxy_config()
     if not webshare_api_key:
         return None
@@ -157,7 +170,7 @@ def _fetch_webshare_stats() -> dict | None:
                 elif bandwidth_limit_gb is not None:
                     bandwidth_limit_human = f"{bandwidth_limit_gb:g} GB"
 
-    return {
+    result = {
         "bandwidth_total": bandwidth_total,
         "bandwidth_projected": bandwidth_projected,
         "bandwidth_total_human": _format_bytes(bandwidth_total),
@@ -165,6 +178,10 @@ def _fetch_webshare_stats() -> dict | None:
         "bandwidth_limit_gb": bandwidth_limit_gb,
         "bandwidth_limit_human": bandwidth_limit_human,
     }
+    with _webshare_stats_lock:
+        _webshare_stats_cache = result
+        _webshare_stats_cache_time = now
+    return result
 
 
 # --- Worker process management ---

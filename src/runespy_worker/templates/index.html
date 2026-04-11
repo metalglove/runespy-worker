@@ -449,18 +449,18 @@
               <div class="stat-value" id="stat-proxies">{{ proxy_count or 0 }}</div>
               <div class="stat-label">Proxies</div>
             </div>
-            {% if webshare_api_key and proxy_stats %}
+            {% if webshare_api_key %}
             <div class="stat-card">
-              <div class="stat-value" id="stat-bandwidth-current">{{ proxy_stats.bandwidth_total_human }}</div>
+              <div class="stat-value" id="stat-bandwidth-current">{{ proxy_stats.bandwidth_total_human if proxy_stats else '—' }}</div>
               <div class="stat-label">Current Bandwidth</div>
             </div>
             <div class="stat-card stat-card-tooltip" id="stat-bandwidth-projected-card"
-              {% if proxy_stats.bandwidth_limit_human and proxy_stats.bandwidth_limit_human != '—' %}
+              {% if proxy_stats and proxy_stats.bandwidth_limit_human and proxy_stats.bandwidth_limit_human != '—' %}
                 tabindex="0"
                 data-tooltip="Bandwidth limit: {{ proxy_stats.bandwidth_limit_human }}"
                 aria-label="Projected bandwidth. Bandwidth limit: {{ proxy_stats.bandwidth_limit_human }}"
               {% endif %}>
-              <div class="stat-value" id="stat-bandwidth-projected">{{ proxy_stats.bandwidth_projected_human }}</div>
+              <div class="stat-value" id="stat-bandwidth-projected">{{ proxy_stats.bandwidth_projected_human if proxy_stats else '—' }}</div>
               <div class="stat-label">Projected Bandwidth</div>
             </div>
             {% endif %}
@@ -475,7 +475,6 @@
         </div>
         {% endif %}
 
-        {% if logs %}
         <div class="card">
           <h2>Recent logs</h2>
           <div class="log-viewer" id="log-viewer">
@@ -484,7 +483,6 @@
             {% endfor %}
           </div>
         </div>
-        {% endif %}
       </div>
 
       <div class="tab-panel" id="tab-settings">
