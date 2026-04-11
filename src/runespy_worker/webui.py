@@ -13,6 +13,7 @@ from subprocess import CalledProcessError, Popen, run
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
+# --- App setup & global config ---
 app = Flask(__name__)
 RUNE_HOME = Path.home() / ".runespy"
 MASTER_URL = "wss://runespy.com"
@@ -21,6 +22,7 @@ _worker_proc: Popen | None = None
 _proc_lock = threading.Lock()
 
 
+# --- File helpers (read/write local config/state) ---
 def _read_file(name: str) -> str | None:
     p = RUNE_HOME / name
     return p.read_text().strip() if p.exists() else None
@@ -30,6 +32,7 @@ def _has_file(name: str) -> bool:
     return (RUNE_HOME / name).exists()
 
 
+# --- Proxy configuration handling ---
 def _read_proxy_config() -> tuple[str | None, str | None]:
     webshare_key = _read_file("webshare_api_key")
     proxy_url = _read_file("proxy_url")
@@ -41,17 +44,19 @@ def _save_proxy_config(webshare_api_key: str | None, proxy_url: str | None):
     key_path = RUNE_HOME / "webshare_api_key"
     url_path = RUNE_HOME / "proxy_url"
 
+    # Only one proxy method allowed at a time
     if webshare_api_key:
-      key_path.write_text(webshare_api_key.strip())
-      url_path.unlink(missing_ok=True)
+        key_path.write_text(webshare_api_key.strip())
+        url_path.unlink(missing_ok=True)
     elif proxy_url:
-      url_path.write_text(proxy_url.strip())
-      key_path.unlink(missing_ok=True)
+        url_path.write_text(proxy_url.strip())
+        key_path.unlink(missing_ok=True)
     else:
-      key_path.unlink(missing_ok=True)
-      url_path.unlink(missing_ok=True)
+        key_path.unlink(missing_ok=True)
+        url_path.unlink(missing_ok=True)
 
 
+# --- Worker stats & logs reading ---
 def _read_stats() -> dict | None:
     p = RUNE_HOME / "stats.json"
     if not p.exists():
@@ -72,6 +77,7 @@ def _read_logs() -> list[str]:
         return []
 
 
+# --- Formatting helpers (UI display) ---
 def _format_uptime(seconds: int) -> str:
     if seconds < 60:
         return f"{seconds}s"
@@ -94,6 +100,7 @@ def _format_bytes(num: int | float | None) -> str:
     return "0 B"
 
 
+# --- External API calls (Webshare proxy stats) ---
 def _fetch_webshare_json(path: str) -> dict | None:
     webshare_api_key, _ = _read_proxy_config()
     if not webshare_api_key:
@@ -117,6 +124,7 @@ def _fetch_webshare_stats() -> dict | None:
     if not webshare_api_key:
         return None
 
+    # Aggregate usage stats
     aggregate = _fetch_webshare_json("stats/aggregate/")
     if not aggregate:
         return None
@@ -127,6 +135,7 @@ def _fetch_webshare_stats() -> dict | None:
     bandwidth_limit_gb = None
     bandwidth_limit_human = "—"
 
+    # Fetch plan limits
     subscription = _fetch_webshare_json("subscription/")
     if subscription:
         plan_info = subscription.get("plan")
@@ -158,6 +167,7 @@ def _fetch_webshare_stats() -> dict | None:
     }
 
 
+# --- Worker process management ---
 def _is_running() -> bool:
     with _proc_lock:
         if _worker_proc is None:
@@ -166,6 +176,7 @@ def _is_running() -> bool:
 
 
 def _build_worker_cmd() -> list[str]:
+    # Build CLI command with proxy options if present
     cmd = ["uv", "run", "runespy-worker", "run", "--master", MASTER_URL]
     webshare_key, proxy_url = _read_proxy_config()
     if webshare_key:
@@ -200,8 +211,10 @@ def _stop_worker():
         _worker_proc = None
 
 
+# --- Web routes (UI actions) ---
 @app.route("/")
 def index():
+    # Main dashboard page
     worker_id = _read_file("worker_id")
     worker_name = _read_file("worker_name")
     has_secret = _has_file("worker_secret.key")
@@ -245,8 +258,10 @@ def index():
     )
 
 
+# --- CLI wrapper endpoints ---
 @app.route("/register", methods=["POST"])
 def register():
+    # Register worker with master server
     name = request.form.get("name", "").strip()
     if not name:
         name = socket.gethostname()
@@ -267,6 +282,7 @@ def register():
 
 @app.route("/save-secret", methods=["POST"])
 def save_secret():
+    # Save encrypted secret and start worker
     encrypted = request.form.get("encrypted", "").strip()
     if not encrypted:
         return redirect(url_for("index", error="No encrypted secret provided."))
@@ -283,11 +299,13 @@ def save_secret():
     return redirect(url_for("index", success="Secret saved. Worker started."))
 
 
+# --- Proxy config endpoint ---
 @app.route("/save-proxy-config", methods=["POST"])
 def save_proxy_config():
     webshare_key = request.form.get("webshare_api_key", "").strip() or None
     proxy_url = request.form.get("proxy_url", "").strip() or None
 
+    # Prevent conflicting proxy configs
     if webshare_key and proxy_url:
         return redirect(
             url_for(
@@ -299,6 +317,7 @@ def save_proxy_config():
 
     _save_proxy_config(webshare_key, proxy_url)
 
+    # Restart worker to apply changes
     if _is_running():
         _stop_worker()
         _start_worker()
@@ -307,6 +326,7 @@ def save_proxy_config():
     return redirect(url_for("index", success="Proxy config saved.", tab="settings"))
 
 
+# --- Worker control endpoints ---
 @app.route("/run-worker", methods=["POST"])
 def run_worker():
     if not _has_file("worker_secret.key"):
@@ -330,6 +350,7 @@ def stop_worker():
     return redirect(url_for("index", success="Worker stopped."))
 
 
+# --- API endpoint for frontend polling ---
 @app.route("/api/stats")
 def api_stats():
     raw = _read_stats() or {}
@@ -367,15 +388,18 @@ def api_stats():
     return jsonify(response)
 
 
+# --- App entrypoint ---
 def main():
     import os
 
+    # Load proxy config from environment if not set
     if not _read_file("webshare_api_key") and not _read_file("proxy_url"):
         env_key = os.environ.get("WEBSHARE_API_KEY")
         env_proxy = os.environ.get("PROXY_URL")
         if env_key or env_proxy:
             _save_proxy_config(env_key, env_proxy)
 
+    # Auto-start worker if already configured
     if _has_file("worker_secret.key"):
         _start_worker()
 
