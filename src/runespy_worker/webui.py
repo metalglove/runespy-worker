@@ -332,12 +332,30 @@ def stop_worker():
 
 @app.route("/api/stats")
 def api_stats():
-    stats = _read_stats() or {}
+    raw = _read_stats() or {}
     proxy_stats = _fetch_webshare_stats()
 
-    response = dict(stats)
-    response["logs"] = _read_logs()
-    response["is_running"] = _is_running()
+    nested_stats = raw.get("stats", {})
+    config = raw.get("config", {})
+
+    response = {
+        "status": raw.get("status"),
+        "uptime": raw.get("uptime", 0),
+        "proxy_count": raw.get("proxy_count", 0),
+        "is_running": _is_running(),
+        "stats": {
+            "completed": nested_stats.get("completed", 0),
+            "failed": nested_stats.get("failed", 0),
+            "batches_received": nested_stats.get("batches_received", 0),
+            "batches_sent": nested_stats.get("batches_sent", 0),
+        },
+        "config": {
+            "rate_limit_per_hour": config.get("rate_limit_per_hour"),
+            "fetch_delay": config.get("fetch_delay"),
+            "max_concurrent": config.get("max_concurrent"),
+        },
+        "logs": _read_logs(),
+    }
 
     if proxy_stats:
         response["proxyStats"] = {
