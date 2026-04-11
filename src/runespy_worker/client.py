@@ -137,7 +137,11 @@ _state: dict = {
 _recent_logs: deque[str] = deque(maxlen=200)
 _STATS_PATH = Path.home() / ".runespy" / "stats.json"
 _LOGS_PATH = Path.home() / ".runespy" / "logs.json"
+_TIMING_HISTORY_PATH = Path.home() / ".runespy" / "timing_history.json"
 _TIMING_WINDOW = 200
+_TIMING_HISTORY_RETENTION_SECONDS = 24 * 3600
+_TIMING_HISTORY_INTERVAL_SECONDS = 30
+_timing_history_last_write = 0.0
 _timings: dict[str, deque[float]] = {
     "fetch_ms": deque(maxlen=_TIMING_WINDOW),
     "queue_wait_ms": deque(maxlen=_TIMING_WINDOW),
@@ -230,17 +234,58 @@ def _atomic_write(path: Path, content: str):
     tmp.replace(path)
 
 
+def _read_timing_history() -> list[dict]:
+    if not _TIMING_HISTORY_PATH.exists():
+        return []
+    try:
+        data = json.loads(_TIMING_HISTORY_PATH.read_text())
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _write_timing_history(snapshot: dict):
+    global _timing_history_last_write
+
+    if not snapshot.get("window"):
+        return
+
+    now = time.time()
+    if now - _timing_history_last_write < _TIMING_HISTORY_INTERVAL_SECONDS:
+        return
+    _timing_history_last_write = now
+
+    cutoff = now - _TIMING_HISTORY_RETENTION_SECONDS
+    history: list[dict] = []
+    for row in _read_timing_history():
+        if not isinstance(row, dict):
+            continue
+        try:
+            ts = float(row.get("ts", 0))
+        except (TypeError, ValueError):
+            continue
+        if ts >= cutoff:
+            history.append(row)
+    history.append({"ts": now, **snapshot})
+    try:
+        _atomic_write(_TIMING_HISTORY_PATH, json.dumps(history))
+    except OSError:
+        pass
+
+
 def _write_stats():
     """Write current stats + state to JSON files for the web UI."""
+    timing_snapshot = _timing_snapshot()
     data = {
         **_state,
         "stats": {**_stats},
-        "request_timing": _timing_snapshot(),
+        "request_timing": timing_snapshot,
         "uptime": int(time.time() - _state.get("_start_time", time.time())),
         "updated_at": datetime.now(UTC).isoformat(),
     }
     data.pop("_start_time", None)
     try:
+        _write_timing_history(timing_snapshot)
         _atomic_write(_STATS_PATH, json.dumps(data))
         _atomic_write(_LOGS_PATH, json.dumps(list(_recent_logs)))
     except OSError:

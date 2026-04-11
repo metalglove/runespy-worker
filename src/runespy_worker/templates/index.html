@@ -640,9 +640,10 @@
       });
     }
 
-    function appendTimingPoint(rt) {
+    function appendTimingPoint(rt, tsMillis, skipUpdate) {
       if (!timingChart || !rt || !rt.window) return;
-      const nowLabel = new Date().toLocaleTimeString();
+      const pointTs = tsMillis || Date.now();
+      const nowLabel = new Date(pointTs).toLocaleTimeString();
       timingChart.data.labels.push(nowLabel);
       timingChart.data.datasets[0].data.push(rt.fetch_ms_p50 ?? null);
       timingChart.data.datasets[1].data.push(rt.fetch_ms_p95 ?? null);
@@ -656,6 +657,20 @@
         timingChart.data.labels.shift();
         timingChart.data.datasets.forEach(ds => ds.data.shift());
       }
+      if (!skipUpdate) timingChart.update();
+    }
+
+    function preloadTimingHistory(history) {
+      if (!timingChart || !Array.isArray(history) || history.length === 0) return;
+
+      timingChart.data.labels = [];
+      timingChart.data.datasets.forEach(ds => { ds.data = []; });
+
+      history.forEach((row) => {
+        if (!row || !row.window) return;
+        const tsMs = Number(row.ts || 0) * 1000;
+        appendTimingPoint(row, isFinite(tsMs) && tsMs > 0 ? tsMs : Date.now(), true);
+      });
       timingChart.update();
     }
 
@@ -750,19 +765,24 @@
     if (lv) prevLogCount = lv.querySelectorAll('.log-line').length;
 
     buildTimingChart();
+    const initialTimingHistory = {{ timing_history|default([], true)|tojson }};
+    preloadTimingHistory(initialTimingHistory);
+
     {% if stats and stats.request_timing and stats.request_timing.window %}
-    appendTimingPoint({
-      fetch_ms_p50: {{ stats.request_timing.fetch_ms_p50 }},
-      fetch_ms_p95: {{ stats.request_timing.fetch_ms_p95 }},
-      queue_wait_ms_p95: {{ stats.request_timing.queue_wait_ms_p95 }},
-      proxy_fetch_ms_p95: {{ stats.request_timing.proxy_fetch_ms_p95|default('null', true) }},
-      direct_fetch_ms_p95: {{ stats.request_timing.direct_fetch_ms_p95|default('null', true) }},
-      fallback_direct_fetch_ms_p95: {{ stats.request_timing.fallback_direct_fetch_ms_p95|default('null', true) }},
-      proxy_samples: {{ stats.request_timing.proxy_samples|default(0) }},
-      direct_samples: {{ stats.request_timing.direct_samples|default(0) }},
-      fallback_direct_samples: {{ stats.request_timing.fallback_direct_samples|default(0) }},
-      window: {{ stats.request_timing.window }}
-    });
+    if (!Array.isArray(initialTimingHistory) || initialTimingHistory.length === 0) {
+      appendTimingPoint({
+        fetch_ms_p50: {{ stats.request_timing.fetch_ms_p50 }},
+        fetch_ms_p95: {{ stats.request_timing.fetch_ms_p95 }},
+        queue_wait_ms_p95: {{ stats.request_timing.queue_wait_ms_p95 }},
+        proxy_fetch_ms_p95: {{ stats.request_timing.proxy_fetch_ms_p95|default('null', true) }},
+        direct_fetch_ms_p95: {{ stats.request_timing.direct_fetch_ms_p95|default('null', true) }},
+        fallback_direct_fetch_ms_p95: {{ stats.request_timing.fallback_direct_fetch_ms_p95|default('null', true) }},
+        proxy_samples: {{ stats.request_timing.proxy_samples|default(0) }},
+        direct_samples: {{ stats.request_timing.direct_samples|default(0) }},
+        fallback_direct_samples: {{ stats.request_timing.fallback_direct_samples|default(0) }},
+        window: {{ stats.request_timing.window }}
+      });
+    }
     {% endif %}
 
     setInterval(refresh, 3000);

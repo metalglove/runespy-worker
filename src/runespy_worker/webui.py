@@ -76,6 +76,17 @@ def _read_logs() -> list[str]:
         return []
 
 
+def _read_timing_history() -> list[dict]:
+    p = RUNE_HOME / "timing_history.json"
+    if not p.exists():
+        return []
+    try:
+        data = json.loads(p.read_text())
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
 def _format_uptime(seconds: int) -> str:
     if seconds < 60:
         return f"{seconds}s"
@@ -141,6 +152,7 @@ def index():
 
     stats = _read_stats()
     logs = _read_logs()
+    timing_history = _read_timing_history()
     webshare_api_key, proxy_url = _read_proxy_config()
 
     worker_status = None
@@ -164,6 +176,7 @@ def index():
         worker_status=worker_status,
         stats=stats,
         logs=logs,
+        timing_history=timing_history,
         uptime_display=uptime_display,
         webshare_api_key=webshare_api_key,
         proxy_url=proxy_url,
