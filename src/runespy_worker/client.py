@@ -63,7 +63,7 @@ from runespy_worker.protocol import build_message
 
 logger = logging.getLogger("runespy_worker")
 
-BATCH_FLUSH_INTERVAL = 2.0  # seconds between batch sends
+BATCH_FLUSH_INTERVAL = 0.5  # seconds between batch sends
 BATCH_MAX_SIZE = 100        # send early if this many results are queued
 
 
