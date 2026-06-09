@@ -357,7 +357,10 @@ async def batch_sender_loop(
             )
         except Exception as e:
             logger.warning("Failed to send batch: %s — re-queuing %d item(s)", e, len(items))
+            now = datetime.now(UTC).isoformat()
             for item in items:
+                if "fetched_at" in item:
+                    item["fetched_at"] = now
                 await result_queue.put(item)
             break
 
