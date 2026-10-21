@@ -1,6 +1,6 @@
 """Minimal web UI for runespy-worker setup, monitoring, and proxy configuration.
 
-Wraps the CLI commands (register, save-secret, run) and reads the stats/logs
+Wraps the CLI commands (register, run) and reads the stats/logs
 files written by the worker process to display a live dashboard.
 """
 
@@ -318,7 +318,7 @@ def _stop_worker():
 def index():
     worker_id = _read_file("worker_id")
     worker_name = _read_file("worker_name")
-    has_secret = _has_file("worker_secret.key")
+    has_identity = bool(worker_id) and _has_file("worker_key.pem")
     is_running = _is_running()
 
     stats = _read_stats()
@@ -344,7 +344,7 @@ def index():
     return render_template("index.html",
         worker_id=worker_id,
         worker_name=worker_name,
-        has_secret=has_secret,
+        has_identity=has_identity,
         is_running=is_running,
         worker_status=worker_status,
         stats=stats,
@@ -382,24 +382,6 @@ def register():
     return redirect(url_for("index", success="Registered successfully. Share your worker ID with the admin."))
 
 
-@app.route("/save-secret", methods=["POST"])
-def save_secret():
-    encrypted = request.form.get("encrypted", "").strip()
-    if not encrypted:
-        return redirect(url_for("index", error="No encrypted secret provided."))
-
-    try:
-        run(
-            ["uv", "run", "runespy-worker", "save-secret", "--encrypted", encrypted],
-            check=True,
-        )
-    except CalledProcessError as e:
-        return redirect(url_for("index", error=f"Failed to save secret: {e}"))
-
-    _start_worker()
-    return redirect(url_for("index", success="Secret saved. Worker started."))
-
-
 @app.route("/save-proxy-config", methods=["POST"])
 def save_proxy_config():
     webshare_key = request.form.get("webshare_api_key", "").strip() or None
@@ -420,16 +402,16 @@ def save_proxy_config():
 
 @app.route("/run-worker", methods=["POST"])
 def run_worker():
-    if not _has_file("worker_secret.key"):
-        return redirect(url_for("index", error="Save the shared secret first."))
+    if not (_has_file("worker_id") and _has_file("worker_key.pem")):
+        return redirect(url_for("index", error="Register this worker first."))
     _start_worker()
     return redirect(url_for("index", success="Worker started."))
 
 
 @app.route("/restart-worker", methods=["POST"])
 def restart_worker():
-    if not _has_file("worker_secret.key"):
-        return redirect(url_for("index", error="Save the shared secret first."))
+    if not (_has_file("worker_id") and _has_file("worker_key.pem")):
+        return redirect(url_for("index", error="Register this worker first."))
     _stop_worker()
     _start_worker()
     return redirect(url_for("index", success="Worker restarted."))
@@ -497,7 +479,7 @@ def main():
             _save_proxy_config(env_key, env_proxy)
 
     # Auto-start worker if credentials are present
-    if _has_file("worker_secret.key"):
+    if _has_file("worker_id") and _has_file("worker_key.pem"):
         _start_worker()
 
     app.run(host="0.0.0.0", port=8080)

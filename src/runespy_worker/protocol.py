@@ -1,11 +1,12 @@
 """Message envelope construction and HMAC verification for the worker protocol.
 
-Every message sent by the worker uses a signed JSON envelope:
+Messages use a JSON envelope on an Ed25519-authenticated WebSocket. The optional
+legacy HMAC field is retained for callers but is not required by the server:
 
     {
         "type":      "<message_type>",
         "id":        "<uuid4>",          # unique per message; used for dedup
-        "ts":        1741305600.123,      # Unix timestamp; server rejects if >30s old
+        "ts":        1741305600.123,      # Unix timestamp
         "worker_id": "<worker_uuid>",
         "payload":   { ... },            # message-type-specific data
         "hmac":      "<hex_digest>"      # HMAC-SHA256 over all other fields
@@ -39,7 +40,7 @@ def canonical_json(msg: dict) -> bytes:
     return json.dumps(signable, sort_keys=True, separators=(",", ":")).encode()
 
 
-def build_message(msg_type: str, payload: dict, worker_id: str, secret: bytes) -> str:
+def build_message(msg_type: str, payload: dict, worker_id: str, secret: bytes | None = None) -> str:
     """Build a complete signed message envelope and return it as a JSON string.
 
     Assigns a fresh UUID and current timestamp, then appends the HMAC digest
@@ -52,7 +53,8 @@ def build_message(msg_type: str, payload: dict, worker_id: str, secret: bytes) -
         "worker_id": worker_id,
         "payload": payload,
     }
-    msg["hmac"] = _hmac.new(secret, canonical_json(msg), hashlib.sha256).hexdigest()
+    if secret is not None:
+        msg["hmac"] = _hmac.new(secret, canonical_json(msg), hashlib.sha256).hexdigest()
     return json.dumps(msg)
 
 
