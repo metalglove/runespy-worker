@@ -41,10 +41,10 @@ def canonical_json(msg: dict) -> bytes:
 
 
 def build_message(msg_type: str, payload: dict, worker_id: str, secret: bytes | None = None) -> str:
-    """Build a complete signed message envelope and return it as a JSON string.
+    """Build a JSON envelope, optionally adding the legacy HMAC field.
 
-    Assigns a fresh UUID and current timestamp, then appends the HMAC digest
-    computed over the canonical form of the message.
+    Assigns a fresh UUID and current timestamp. When a legacy secret is
+    supplied, append its digest; current authenticated sessions pass None.
     """
     msg = {
         "type": msg_type,

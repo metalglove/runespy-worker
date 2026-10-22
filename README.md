@@ -232,7 +232,9 @@ No credentials, cookies, or account data are ever accessed. Only public RuneMetr
 
 ## Protocol overview
 
-All worker-to-server messages use a signed JSON envelope:
+Messages use a JSON envelope over the authenticated WebSocket. The runtime
+uses Ed25519 challenge-response for authentication; subsequent envelopes have
+no HMAC. Use `wss://` to protect the connection in transit:
 
 ```json
 {
@@ -240,7 +242,6 @@ All worker-to-server messages use a signed JSON envelope:
   "id": "<uuid4>",
   "ts": 1741305600.123,
   "worker_id": "<worker_uuid>",
-  "hmac": "<hex_digest>",
   "payload": { ... }
 }
 ```
@@ -252,13 +253,20 @@ Worker                          Master
   │                               │
   │──── connect ──────────────────▶│
   │◀──── challenge {nonce} ────────│
-  │──── auth {sig, hmac} ─────────▶│
+  │──── auth {signature} ─────────▶│
   │◀──── config {delay, limits} ───│
-  │──── ready {capacity} ─────────▶│
-  │◀──── assign_batch {tasks} ─────│
-  │──── batch_result {results} ───▶│
+  │──── ready {capacity, capabilities} ─────────▶│
+  │◀──── assign_batch {tasks + attempt_count} ─────│
+  │──── batch_result {results + attempt_count} ───▶│
   │         ...                    │
 ```
+
+The `auth.payload.signature` signs the server nonce with the registered
+Ed25519 private key. The ready capabilities include `assignment_attempt_v1`.
+Every success/error result echoes its assigned `task_id` and `attempt_count`;
+the master rejects stale generations and results from another worker.
+The optional HMAC helpers in `protocol.py` are legacy compatibility utilities,
+not a second authentication requirement or a secret-distribution mechanism.
 
 ### Task lifecycle
 
