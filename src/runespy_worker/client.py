@@ -27,8 +27,8 @@ fresh connection the full handshake is repeated:
 
   1. Receive ``challenge`` (random hex nonce from server).
   2. Sign nonce with Ed25519 private key (proves worker identity).
-  3. Compute HMAC-SHA256 of nonce with shared secret (proves secret possession).
-  4. Send ``auth`` envelope containing both proofs.
+  3. No shared-secret exchange is needed; the challenge proves key possession.
+  4. Send ``auth`` envelope containing the challenge signature.
   5. Receive ``config`` (per-worker fetch parameters) or ``error`` (auth failure).
   6. Send ``ready`` (advertise concurrency capacity to the dispatcher).
   7. Enter message dispatch loop: ``assign_batch`` → spawn tasks,
@@ -52,9 +52,7 @@ import httpx
 import websockets
 
 from runespy_worker.crypto import (
-    hmac_challenge,
     load_private_key,
-    load_secret,
     load_worker_id,
     sign_challenge,
 )
@@ -299,7 +297,7 @@ async def stats_writer_loop(interval: float = 5.0):
         await asyncio.sleep(interval)
 
 
-async def heartbeat_loop(ws, worker_id: str, secret: bytes, interval: float = 30.0):
+async def heartbeat_loop(ws, worker_id: str, secret: bytes | None, interval: float = 30.0):
     """Send a signed ``heartbeat`` message to the server every *interval* seconds.
 
     The heartbeat carries cumulative task counters and the current uptime so the
@@ -328,7 +326,7 @@ async def batch_sender_loop(
     ws,
     result_queue: asyncio.Queue,
     worker_id: str,
-    secret: bytes,
+    secret: bytes | None,
 ):
     """Drain the result queue and send ``batch_result`` messages to the server.
 
@@ -369,7 +367,7 @@ async def process_task(
     result_queue: asyncio.Queue,
     task: dict,
     worker_id: str,
-    secret: bytes,
+    secret: bytes | None,
     proxy_cycle: itertools.cycle | None,
     semaphore: asyncio.Semaphore,
     rate_limiter: RateLimiter,
@@ -459,6 +457,7 @@ async def process_task(
                 await result_queue.put({
                     "status": "error",
                     "task_id": task_id,
+                    "attempt_count": task.get("attempt_count"),
                     "username": username,
                     "error_code": error,
                     "detail": "",
@@ -468,6 +467,7 @@ async def process_task(
                 await result_queue.put({
                     "status": "success",
                     "task_id": task_id,
+                    "attempt_count": task.get("attempt_count"),
                     "username": username,
                     "data": data,
                     "fetch_time_ms": round(fetch_time_ms, 1),
@@ -483,12 +483,21 @@ async def process_task(
             _state["in_flight"] = max(0, int(_state.get("in_flight", 0)) - 1)
 
 
+def worker_capabilities() -> dict[str, bool]:
+    """Advertise the full protocol on every ready message, including refreshes."""
+    return {
+        "accurate_current_load": True,
+        "request_timing_v1": True,
+        "assignment_attempt_v1": True,
+    }
+
+
 async def _proxy_refresh_loop(
     api_key: str,
     proxy_state: dict,
     ws,
     worker_id: str,
-    secret: bytes,
+    secret: bytes | None,
     max_concurrent: int,
     interval: float = 1800.0,
 ):
@@ -527,10 +536,7 @@ async def _proxy_refresh_loop(
         )
 
         ready_payload: dict[str, object] = {"capacity": max_concurrent, "has_proxy": True, "proxy_count": len(urls)}
-        ready_payload["capabilities"] = {
-            "accurate_current_load": True,
-            "request_timing_v1": True,
-        }
+        ready_payload["capabilities"] = worker_capabilities()
         ready_msg = build_message("ready", ready_payload, worker_id, secret)
         try:
             await ws.send(ready_msg)
@@ -541,11 +547,10 @@ async def _proxy_refresh_loop(
 async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | None = None, webshare_api_key: str | None = None):
     """Connect to the master server and run the worker until interrupted.
 
-    Loads credentials from ``~/.runespy/`` (worker_id, private key, shared
-    secret) then enters an outer reconnection loop.  On each connection attempt:
+    Loads credentials from ``~/.runespy/`` (worker_id and private key) then enters an outer reconnection loop.  On each connection attempt:
 
     1. Open WebSocket to ``/api/workers/ws/connect?worker_id=<id>``.
-    2. Complete the two-factor auth handshake (Ed25519 + HMAC challenge-response).
+    2. Complete the Ed25519 challenge-response handshake.
     3. Apply server-supplied config (fetch delay, concurrency, rate limit).
     4. Advertise capacity with a ``ready`` message.
     5. Dispatch incoming ``assign_batch`` tasks as concurrent coroutines.
@@ -558,7 +563,7 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
 
     worker_id = load_worker_id()
     private_key = load_private_key()
-    secret = load_secret()
+    secret = None  # compatibility argument; session authentication uses Ed25519
 
     _state["worker_id"] = worker_id
     _state["_start_time"] = time.time()
@@ -566,7 +571,6 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
 
     logger.info("Worker ID: %s", worker_id)
     logger.info("Ed25519 public key loaded")
-    logger.info("HMAC shared secret loaded (%d bytes)", len(secret))
 
     proxy_cycle = None
     if proxy_urls:
@@ -608,17 +612,9 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
 
                 # Respond with auth
                 sig = sign_challenge(private_key, nonce)
-                mac = hmac_challenge(secret, nonce)
-                logger.info(
-                    "Signing challenge — Ed25519 sig=%s... HMAC=%s...",
-                    sig[:16], mac[:16],
-                )
-                auth_msg = build_message("auth", {
-                    "signature": sig,
-                    "hmac": mac,
-                }, worker_id, secret)
+                auth_msg = build_message("auth", {"signature": sig}, worker_id, secret)
                 await ws.send(auth_msg)
-                logger.info("Auth message sent (HMAC-SHA256 envelope)")
+                logger.info("Ed25519 challenge response sent")
 
                 # Wait for config
                 config_raw = await ws.recv()
@@ -651,10 +647,7 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                 if _proxy["urls"]:
                     ready_payload["has_proxy"] = True
                     ready_payload["proxy_count"] = len(_proxy["urls"])
-                ready_payload["capabilities"] = {
-                    "accurate_current_load": True,
-                    "request_timing_v1": True,
-                }
+                ready_payload["capabilities"] = worker_capabilities()
                 ready_msg = build_message("ready", ready_payload, worker_id, secret)
                 await ws.send(ready_msg)
                 _state["status"] = "running"
@@ -727,10 +720,7 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                             if _proxy["urls"]:
                                 ready_payload["has_proxy"] = True
                                 ready_payload["proxy_count"] = len(_proxy["urls"])
-                            ready_payload["capabilities"] = {
-                                "accurate_current_load": True,
-                                "request_timing_v1": True,
-                            }
+                            ready_payload["capabilities"] = worker_capabilities()
                             ready_msg = build_message("ready", ready_payload, worker_id, secret)
                             await ws.send(ready_msg)
 

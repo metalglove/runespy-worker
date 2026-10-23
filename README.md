@@ -94,16 +94,11 @@ Note the **worker ID** printed — you'll need to share it with the admin.
 
 ### 3. Wait for approval
 
-Contact the RuneSpy admin (e.g. via Discord) with your worker ID. The admin will approve your worker and send back an `encrypted_secret` blob.
+Contact the RuneSpy admin with your worker ID. Once approved, your registered Ed25519 private key is sufficient to connect; no secret needs to be exchanged.
 
-The secret is only issued once at approval time and is not retrievable again from the server — keep it safe.
-
-### 4. Save the secret and run
+### 4. Run the approved worker
 
 ```bash
-# Save the encrypted secret the admin sent you
-runespy-worker save-secret --encrypted <base64_blob>
-
 # Start the worker
 runespy-worker run --master wss://runespy.com
 ```
@@ -118,7 +113,7 @@ The worker will authenticate, receive task batches, fetch player profiles, and s
 runespy-worker status --master wss://runespy.com
 ```
 
-This shows whether your worker is `pending` or `approved`. It does **not** retrieve or display the shared secret — that is sent to you by the admin out-of-band (e.g. Discord) and saved with `save-secret`.
+This shows whether your registered worker is `pending` or `approved`.
 
 ---
 
@@ -137,7 +132,7 @@ docker run -d \
   ghcr.io/metalglove/runespy-worker
 ```
 
-Open `http://localhost:8080` to register, save your secret, configure proxies, and monitor the worker. The `~/.runespy` volume persists credentials across container restarts.
+Open `http://localhost:8080` to register, configure proxies, and monitor the worker. The `~/.runespy` volume persists credentials across container restarts.
 
 To add proxies, pass the Webshare API key as an environment variable:
 
@@ -160,7 +155,6 @@ docker run -d \
   --entrypoint /entrypoint.sh \
   -e WORKER_ID="$(cat ~/.runespy/worker_id)" \
   -e WORKER_KEY_PEM_B64="$(base64 < ~/.runespy/worker_key.pem)" \
-  -e WORKER_SECRET_B64="$(base64 < ~/.runespy/worker_secret.key)" \
   -e MASTER_URL="wss://runespy.com" \
   -e WEBSHARE_API_KEY="your-api-key" \
   --name runespy-worker \
@@ -186,11 +180,11 @@ The UI guides you through four steps:
 
 1. **Register** — enter a worker name, generates an Ed25519 keypair and registers with the master. Shows your worker ID to share with the admin.
 
-2. **Save secret** — paste the encrypted secret blob from the admin. The worker starts automatically once saved.
+2. **Approval** — share the worker ID with the admin, then start the worker after approval.
 
 3. **Proxy configuration** (optional) — enter a Webshare API key or single proxy URL. The worker restarts automatically to pick up the new config.
 
-4. **Run / Stop / Restart** — control the worker process. If a secret is present when the container starts, the worker starts automatically.
+4. **Run / Stop / Restart** — control the worker process. If a registered ID and private key are present when the container starts, the worker starts automatically.
 
 The dashboard shows live statistics (tasks completed/failed, batches, uptime, proxy count), the server-assigned config (rate limit, concurrency, fetch delay), and a scrolling log viewer.
 
@@ -206,26 +200,25 @@ To keep the container running across reboots, ensure Docker starts on login:
 | Path | Contents | Permissions |
 |------|----------|-------------|
 | `~/.runespy/worker_key.pem` | Ed25519 private key (PEM/PKCS8) | 0600 |
-| `~/.runespy/worker_secret.key` | Raw 32-byte HMAC shared secret | 0600 |
 | `~/.runespy/worker_id` | Worker UUID (not secret) | default |
 
-Both secret files are created with `chmod 600` automatically.
+The private key is created with `chmod 600` automatically.
 
 ---
 
 ## Security model
 
-Each worker is authenticated with a two-factor scheme:
+Each worker authenticates its registered identity on a fresh WebSocket challenge:
 
 1. **Ed25519 challenge-response** — on every connection the server sends a random nonce; the worker signs it with its private key and the server verifies the signature against the registered public key.
-2. **HMAC-SHA256 message signing** — all messages are signed with a 32-byte shared secret issued at approval time. The server stores only a bcrypt hash of this secret; the plaintext is delivered once, encrypted with AES-GCM keyed from your public key.
+2. **Authenticated session** — subsequent messages use that WebSocket session. The previous public-key-XOR secret delivery has been removed; it did not provide recipient confidentiality and the server did not require its HMAC.
 
-Workers that submit structurally invalid, temporally inconsistent, or suspiciously-timed data accumulate violation counts. Repeated hard violations result in suspension.
+Workers that submit structurally invalid, temporally inconsistent, or suspiciously-timed data accumulate violation counts for administrative review.
 
 ### What the server validates on every result
 
 - **Structural**: all required keys present, exactly 29 skills, valid level/XP ranges, skill XP sums match totals
-- **Temporal**: XP, levels, and quest counts never decrease relative to the stored history
+- **Temporal**: XP and skill levels must not decrease relative to stored history
 - **Timing**: fetch timestamp within 60 seconds of server time, fetch duration within a plausible range (5ms–30s)
 
 ### What this worker fetches
@@ -239,7 +232,9 @@ No credentials, cookies, or account data are ever accessed. Only public RuneMetr
 
 ## Protocol overview
 
-All worker-to-server messages use a signed JSON envelope:
+Messages use a JSON envelope over the authenticated WebSocket. The runtime
+uses Ed25519 challenge-response for authentication; subsequent envelopes have
+no HMAC. Use `wss://` to protect the connection in transit:
 
 ```json
 {
@@ -247,7 +242,6 @@ All worker-to-server messages use a signed JSON envelope:
   "id": "<uuid4>",
   "ts": 1741305600.123,
   "worker_id": "<worker_uuid>",
-  "hmac": "<hex_digest>",
   "payload": { ... }
 }
 ```
@@ -259,13 +253,20 @@ Worker                          Master
   │                               │
   │──── connect ──────────────────▶│
   │◀──── challenge {nonce} ────────│
-  │──── auth {sig, hmac} ─────────▶│
+  │──── auth {signature} ─────────▶│
   │◀──── config {delay, limits} ───│
-  │──── ready {capacity} ─────────▶│
-  │◀──── assign_batch {tasks} ─────│
-  │──── batch_result {results} ───▶│
+  │──── ready {capacity, capabilities} ─────────▶│
+  │◀──── assign_batch {tasks + attempt_count} ─────│
+  │──── batch_result {results + attempt_count} ───▶│
   │         ...                    │
 ```
+
+The `auth.payload.signature` signs the server nonce with the registered
+Ed25519 private key. The ready capabilities include `assignment_attempt_v1`.
+Every success/error result echoes its assigned `task_id` and `attempt_count`;
+the master rejects stale generations and results from another worker.
+The optional HMAC helpers in `protocol.py` are legacy compatibility utilities,
+not a second authentication requirement or a secret-distribution mechanism.
 
 ### Task lifecycle
 
@@ -326,8 +327,17 @@ runespy-worker run --master wss://runespy.com --proxy-url "http://user:pass@host
 
 ```
 runespy-worker register    --master <url> --name <name>
-runespy-worker save-secret --encrypted <base64_blob>
 runespy-worker run         --master <url> [--max-concurrent <n>]
                            [--webshare-api-key <key>] [--proxy-url <url>]
 runespy-worker status      --master <url>
 ```
+
+## Assignment generations
+
+This worker advertises `assignment_attempt_v1` and echoes `attempt_count` from
+every assignment in both success and error results. Upgrade workers before
+enabling the matching backend enforcement. Older backends ignore the new field;
+the updated backend leaves legacy workers without this capability unassigned.
+Existing registered IDs and Ed25519 keys remain valid. No secret file is needed.
+
+Run the protocol regressions with `python -m unittest discover -s tests -v`.

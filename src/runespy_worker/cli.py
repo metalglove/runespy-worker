@@ -7,18 +7,13 @@ register    Generate an Ed25519 keypair, register with the master server,
             Blocked if a keypair already exists to prevent accidental
             overwriting of credentials.
 
-save-secret Decrypt the encrypted secret blob issued by the admin and write
-            the raw 32-byte secret to ``~/.runespy/worker_secret.key``.
-            Must be run before ``run``.
-
 run         Connect to the master, authenticate, and start processing tasks.
-            Requires all three credential files to be present.
+            Requires the registered worker ID and Ed25519 private key.
 
-status      Query the REST API for the worker's current status (pending /
-            approved).  Does not retrieve or display the shared secret.
+status      Query the REST API for the worker's current approval status.
 
 All credential files live in ``~/.runespy/``.  See ``crypto.py`` for details
-on the key format and secret delivery scheme.
+on the key format.
 """
 
 import asyncio
@@ -46,7 +41,6 @@ async def _register(master_url: str, name: str):
         CONFIG_DIR,
         ensure_config_dir,
         generate_keypair,
-        get_public_key_b64,
         save_private_key,
         save_worker_id,
     )
@@ -119,11 +113,6 @@ def run(master, max_concurrent, proxy_url, webshare_api_key):
     if not (CONFIG_DIR / "worker_id").exists():
         click.echo("No worker ID found. Run 'runespy-worker register' first.", err=True)
         return
-    if not (CONFIG_DIR / "worker_secret.key").exists():
-        click.echo("No shared secret found. Has the admin approved this worker?", err=True)
-        click.echo("Check with: runespy-worker status --master " + master)
-        return
-
     if proxy_url and webshare_api_key:
         click.echo("Specify either --proxy-url or --webshare-api-key, not both.", err=True)
         return
@@ -218,20 +207,13 @@ def _fetch_webshare_proxies(api_key: str, retries: int = 3) -> list[str]:
 @main.command()
 @click.option("--master", required=True, help="Master server WebSocket URL")
 def status(master):
-    """Check worker approval status and retrieve secret if approved."""
+    """Check worker approval status."""
     asyncio.run(_check_status(master))
 
 
 async def _check_status(master_url: str):
     import httpx
-    from runespy_worker.crypto import (
-        CONFIG_DIR,
-        decrypt_secret,
-        get_public_key_b64,
-        load_private_key,
-        load_worker_id,
-        save_secret,
-    )
+    from runespy_worker.crypto import load_worker_id
 
     try:
         worker_id = load_worker_id()
@@ -249,34 +231,8 @@ async def _check_status(master_url: str):
     status = data.get("status", "unknown")
     click.echo(f"Worker {worker_id}: {status}")
 
-    if status == "approved" and not (CONFIG_DIR / "worker_secret.key").exists():
-        click.echo("Worker is approved but secret not yet saved locally.")
-        click.echo("The encrypted secret was provided during admin approval.")
-        click.echo("Contact the admin to get your encrypted_secret value, then run:")
-        click.echo("  runespy-worker save-secret --encrypted <base64_blob>")
-
-
-@main.command("save-secret")
-@click.option("--encrypted", required=True, help="Base64 encrypted secret from admin")
-def save_secret_cmd(encrypted):
-    """Save the encrypted shared secret after admin approval."""
-    from runespy_worker.crypto import (
-        decrypt_secret,
-        get_public_key_b64,
-        load_private_key,
-        save_secret,
-    )
-
-    private_key = load_private_key()
-    public_key_b64 = get_public_key_b64(private_key)
-
-    try:
-        secret = decrypt_secret(encrypted, public_key_b64)
-        path = save_secret(secret)
-        click.echo(f"Shared secret saved to {path}")
-        click.echo("You can now run: runespy-worker run --master <url>")
-    except Exception as e:
-        click.echo(f"Failed to decrypt secret: {e}", err=True)
+    if status == "approved":
+        click.echo("Approved. Connect with: runespy-worker run --master " + master_url)
 
 
 if __name__ == "__main__":

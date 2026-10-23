@@ -324,7 +324,7 @@
     {% endif %}
 
     {# ── Show setup flow if not fully registered ── #}
-    {% if not has_secret %}
+    {% if not has_identity %}
 
       {# ── Step 1: Register ── #}
       <div class="card step {{ 'done' if worker_id else 'active' }}">
@@ -349,30 +349,9 @@
         </div>
       </div>
 
-      {# ── Step 2: Save secret ── #}
-      <div class="card step {{ 'active' if worker_id else 'locked' }}">
-        <div class="step-header">
-          <div class="step-num">2</div>
-          <span class="step-title">Save shared secret</span>
-        </div>
-        <div class="step-body">
-          {% if worker_id %}
-            <p class="info mb-8">Share your worker ID with the RuneSpy admin. Once approved, paste the encrypted secret below.</p>
-            <form method="post" action="/save-secret">
-              <div class="field">
-                <label>Encrypted secret (base64)</label>
-                <textarea name="encrypted" placeholder="Paste the base64 blob from the admin here..." required></textarea>
-              </div>
-              <button type="submit">Save secret</button>
-            </form>
-          {% else %}
-            <p class="info">Register first to get a worker ID.</p>
-          {% endif %}
-        </div>
-      </div>
-
     {% else %}
 
+      <p class="info">Ask the RuneSpy admin to approve your worker ID before starting.</p>
       {# ── Fully registered: show tabs ── #}
       <div class="tabs">
         <button class="tab active" data-tab="dashboard">Dashboard</button>
@@ -622,7 +601,7 @@
     if (lv) lv.scrollTop = lv.scrollHeight;
 
     // Live updates via /api/stats
-    {% if has_secret %}
+    {% if has_identity %}
     function formatUptime(s) {
       if (s < 60) return s + 's';
       if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
