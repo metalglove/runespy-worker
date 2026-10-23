@@ -1,3 +1,4 @@
+import itertools
 import asyncio
 import json
 import importlib.util
@@ -31,6 +32,22 @@ class AssignmentProtocolTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result["attempt_count"], 7)
                 self.assertEqual(result["task_id"], "task")
                 self.assertEqual(result["status"], "error" if error else "success")
+
+    async def test_same_count_proxy_refresh_preserves_assignment_capability(self):
+        ws = Mock(send=AsyncMock())
+        state = {"urls": ["http://old:8000"], "cycle": itertools.cycle(["http://old:8000"])}
+        with patch.object(client.asyncio, "sleep", AsyncMock(side_effect=[None, asyncio.CancelledError()])), \
+             patch.object(client.asyncio, "to_thread", AsyncMock(return_value=["http://new:8000"])):
+            with self.assertRaises(asyncio.CancelledError):
+                await client._proxy_refresh_loop("dummy", state, ws, "worker", None, 3, interval=0)
+        payload = json.loads(ws.send.call_args.args[0])["payload"]
+        self.assertEqual(payload["proxy_count"], 1)
+        self.assertEqual(payload["capabilities"], client.worker_capabilities())
+        self.assertTrue(payload["capabilities"]["assignment_attempt_v1"])
+        self.assertEqual(state["urls"], ["http://new:8000"])
+        first = client.worker_capabilities()
+        first.clear()
+        self.assertTrue(client.worker_capabilities()["assignment_attempt_v1"])
 
     def test_identity_challenge_requires_the_private_key(self):
         private = Ed25519PrivateKey.generate()

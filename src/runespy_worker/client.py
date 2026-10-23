@@ -483,6 +483,15 @@ async def process_task(
             _state["in_flight"] = max(0, int(_state.get("in_flight", 0)) - 1)
 
 
+def worker_capabilities() -> dict[str, bool]:
+    """Advertise the full protocol on every ready message, including refreshes."""
+    return {
+        "accurate_current_load": True,
+        "request_timing_v1": True,
+        "assignment_attempt_v1": True,
+    }
+
+
 async def _proxy_refresh_loop(
     api_key: str,
     proxy_state: dict,
@@ -527,10 +536,7 @@ async def _proxy_refresh_loop(
         )
 
         ready_payload: dict[str, object] = {"capacity": max_concurrent, "has_proxy": True, "proxy_count": len(urls)}
-        ready_payload["capabilities"] = {
-            "accurate_current_load": True,
-            "request_timing_v1": True,
-        }
+        ready_payload["capabilities"] = worker_capabilities()
         ready_msg = build_message("ready", ready_payload, worker_id, secret)
         try:
             await ws.send(ready_msg)
@@ -641,11 +647,7 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                 if _proxy["urls"]:
                     ready_payload["has_proxy"] = True
                     ready_payload["proxy_count"] = len(_proxy["urls"])
-                ready_payload["capabilities"] = {
-                    "accurate_current_load": True,
-                    "request_timing_v1": True,
-                    "assignment_attempt_v1": True,
-                }
+                ready_payload["capabilities"] = worker_capabilities()
                 ready_msg = build_message("ready", ready_payload, worker_id, secret)
                 await ws.send(ready_msg)
                 _state["status"] = "running"
@@ -718,11 +720,7 @@ async def run(master_url: str, max_concurrent: int = 5, proxy_urls: list[str] | 
                             if _proxy["urls"]:
                                 ready_payload["has_proxy"] = True
                                 ready_payload["proxy_count"] = len(_proxy["urls"])
-                            ready_payload["capabilities"] = {
-                                "accurate_current_load": True,
-                                "request_timing_v1": True,
-                                "assignment_attempt_v1": True,
-                            }
+                            ready_payload["capabilities"] = worker_capabilities()
                             ready_msg = build_message("ready", ready_payload, worker_id, secret)
                             await ws.send(ready_msg)
 
