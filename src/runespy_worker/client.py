@@ -478,6 +478,9 @@ def worker_capabilities() -> dict[str, bool]:
         "accurate_current_load": True,
         "request_timing_v1": True,
         "assignment_attempt_v1": True,
+        # Fetches from the RuneScape Platform API; the master refuses
+        # assignments to workers without it (RuneMetrics retired 2026-11-10).
+        "platform_api_v1": True,
     }
 
 
