@@ -2,7 +2,7 @@
 
 Distributed worker client for [RuneSpy](https://runespy.com) — a RuneScape player tracking service.
 
-Workers are volunteer-run processes that fetch player data from the RuneMetrics API on the tracker's behalf. The master server never fetches data itself; all API calls go through connected workers.
+Workers are volunteer-run processes that fetch player data from the RuneScape Platform API on the tracker's behalf. The master server never fetches data itself; all API calls go through connected workers.
 
 ## Quick start (Docker)
 
@@ -37,10 +37,10 @@ Open **http://localhost:8080** to register, get approved, and start tracking. Se
     │ Worker  │       │  (CLI)  │      │  (CLI)  │
     └────┬────┘       └────┬────┘      └────┬────┘
          │                 │                │
-         └────────── RuneMetrics API ───────┘
+         └──────── Platform API ────────────┘
 ```
 
-Workers connect over a persistent WebSocket, receive batches of usernames to look up, fetch their RuneMetrics profiles, and stream results back to the master for validation and storage.
+Workers connect over a persistent WebSocket, receive batches of usernames to look up, fetch their profiles from the Platform API, and stream results back to the master for validation and storage.
 
 ## Requirements
 
@@ -223,10 +223,13 @@ Workers that submit structurally invalid, temporally inconsistent, or suspicious
 
 ### What this worker fetches
 
-- `https://apps.runescape.com/runemetrics/profile/profile` — player profile (XP, skills, activities)
-- `https://secure.runescape.com/m=hiscore/index_lite.ws` — hiscores fallback for private profiles
+RuneMetrics was retired on 10 November 2026; the worker uses the [RuneScape Platform API](https://developer.runescape.com/platform/):
 
-No credentials, cookies, or account data are ever accessed. Only public RuneMetrics and hiscores endpoints are used.
+- `https://secure.runescape.com/m=hiscore/index_lite.json` — skills, XP and ranks
+- `https://secure.runescape.com/m=adventurers-log/api/v1/playerEvents/NAME` — the 20 most recent activities
+- `https://secure.runescape.com/m=adventurers-log/api/v1/playerQuests/NAME` — quest statuses (for quest counts)
+
+No credentials, cookies, or account data are ever accessed. Only public Platform API endpoints are used.
 
 ---
 

@@ -141,16 +141,19 @@ def run(master, max_concurrent, proxy_url, webshare_api_key):
 
 
 def _test_proxy(proxy_url: str) -> bool:
-    """Test a single proxy by hitting the RuneMetrics API."""
+    """Test a single proxy by hitting the RuneScape Platform API (hiscores)."""
     import httpx as _httpx
+
+    from runespy_worker.fetcher import HEADERS, HISCORES_URL
 
     masked = proxy_url.split("@")[-1] if "@" in proxy_url else proxy_url
     click.echo(f"Testing proxy connectivity via {masked}...")
     try:
         with _httpx.Client(proxy=proxy_url) as client:
             resp = client.get(
-                "https://apps.runescape.com/runemetrics/profile/profile",
-                params={"user": "Zezima", "activities": 0},
+                HISCORES_URL,
+                params={"player": "Zezima"},
+                headers=HEADERS,
                 timeout=10,
             )
             resp.raise_for_status()
