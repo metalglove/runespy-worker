@@ -100,17 +100,21 @@ async def fetch_hiscores(client: httpx.AsyncClient, username: str) -> dict:
     return body
 
 
-async def fetch_events(client: httpx.AsyncClient, username: str) -> list:
-    """Recent events; non-members and hidden players have an empty feed."""
+async def fetch_events(client: httpx.AsyncClient, username: str) -> dict:
+    """``{name, events}``; non-members and hidden players have an empty feed.
+
+    ``name`` is the canonical display name (hiscores only echo the request).
+    """
     try:
         body = await _get_json(client, _player_url("playerEvents", username))
     except _FetchError as e:
         if e.status == 404 or _error_name(e) in ("PLAYER_NOT_MEMBER", "PLAYER_NOT_FOUND"):
-            return []
+            name = e.body.get("name") if isinstance(e.body, dict) else None
+            return {"name": name, "events": []}
         raise
     if not isinstance(body, dict) or not isinstance(body.get("events"), list):
         raise _FetchError("API_ERROR")
-    return body["events"]
+    return body
 
 
 async def fetch_quests(client: httpx.AsyncClient, username: str) -> dict | None:
@@ -126,7 +130,7 @@ async def fetch_quests(client: httpx.AsyncClient, username: str) -> dict | None:
     return body
 
 
-def build_profile(username: str, hiscores: dict, events: list, quests: dict | None) -> dict:
+def build_profile(username: str, hiscores: dict, events: dict, quests: dict | None) -> dict:
     """Assemble a RuneMetrics-shaped profile from Platform API responses."""
     skills = [s for s in hiscores.get("skills") or [] if isinstance(s, dict)]
     overall = next((s for s in skills if s.get("id") == 0), {})
@@ -151,7 +155,7 @@ def build_profile(username: str, hiscores: dict, events: list, quests: dict | No
         "rank": f"{rank:,}" if type(rank) is int and rank > 0 else None,
         "activities": [
             {k: e.get(k) for k in ("date", "text", "details", "type")}
-            for e in events if isinstance(e, dict)
+            for e in events.get("events") or [] if isinstance(e, dict)
         ],
         "_source": PLATFORM_SOURCE,
     }
@@ -160,8 +164,11 @@ def build_profile(username: str, hiscores: dict, events: list, quests: dict | No
         data["questscomplete"] = statuses.count("COMPLETED")
         data["questsstarted"] = statuses.count("STARTED")
         data["questsnotstarted"] = statuses.count("NOT_STARTED")
-        if isinstance(quests.get("name"), str):
-            data["name"] = quests["name"]
+    # Canonical display name: playerEvents first, then playerQuests.
+    for source in (events, quests or {}):
+        if isinstance(source.get("name"), str) and source["name"].strip():
+            data["name"] = source["name"]
+            break
     return data
 
 

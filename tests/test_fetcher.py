@@ -84,6 +84,13 @@ class FetcherTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(error)
         self.assertNotIn("questscomplete", data)
 
+    async def test_display_name_prefers_events_then_quests(self):
+        data, _ = await self.fetch(quests=(500, {"error": "INTERNAL_ERROR"}))
+        self.assertEqual(data["name"], "Le Me")
+        data, _ = await self.fetch(events=(403, {"error": "PLAYER_NOT_MEMBER"}),
+                                   quests=(500, {"error": "INTERNAL_ERROR"}))
+        self.assertEqual(data["name"], "le me")
+
     async def test_rate_limit(self):
         self.assertEqual(await self.fetch(hiscores=(429, {})), (None, "RATE_LIMITED"))
         self.assertEqual(await self.fetch(quests=(429, {})), (None, "RATE_LIMITED"))
