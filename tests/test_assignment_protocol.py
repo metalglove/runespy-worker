@@ -24,8 +24,7 @@ class AssignmentProtocolTests(unittest.IsolatedAsyncioTestCase):
                 task = {"task_id": "task", "username": "alice", "attempt_count": 7}
                 context = AsyncMock()
                 with patch.object(client.httpx, "AsyncClient", return_value=context), \
-                     patch.object(client, "fetch_profile", AsyncMock(return_value=({}, error))), \
-                     patch.object(client, "fetch_hiscores", AsyncMock(return_value=(None, error))):
+                     patch.object(client, "fetch_profile", AsyncMock(return_value=({}, error))):
                     await client.process_task(queue, task, "worker", None, None,
                                               asyncio.Semaphore(1), AsyncMock(), 0)
                 result = queue.get_nowait()

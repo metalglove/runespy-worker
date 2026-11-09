@@ -56,7 +56,7 @@ from runespy_worker.crypto import (
     load_worker_id,
     sign_challenge,
 )
-from runespy_worker.fetcher import fetch_hiscores, fetch_profile
+from runespy_worker.fetcher import fetch_profile
 from runespy_worker.protocol import build_message
 
 logger = logging.getLogger("runespy_worker")
@@ -410,12 +410,7 @@ async def process_task(
             async with httpx.AsyncClient(proxy=proxy_url) as client:
                 data, error = await fetch_profile(client, username)
                 if error == "PROFILE_PRIVATE":
-                    logger.info("Profile private for %s, trying hiscores fallback", username)
-                    data, error = await fetch_hiscores(client, username)
-                    if error:
-                        error = "PROFILE_PRIVATE"
-                elif error == "NOT_A_MEMBER":
-                    logger.info("Player %s is banned (NOT_A_MEMBER)", username)
+                    logger.info("%s is not on the hiscores", username)
             first_attempt_elapsed_ms = (time.time() * 1000) - first_attempt_started_ms
             if proxy_url:
                 proxy_attempt_ms = first_attempt_elapsed_ms
@@ -428,12 +423,6 @@ async def process_task(
                 fallback_started_ms = time.time() * 1000
                 async with httpx.AsyncClient() as direct_client:
                     data, error = await fetch_profile(direct_client, username)
-                    if error == "PROFILE_PRIVATE":
-                        data, error = await fetch_hiscores(direct_client, username)
-                        if error:
-                            error = "PROFILE_PRIVATE"
-                    elif error == "NOT_A_MEMBER":
-                        logger.info("Player %s is banned (NOT_A_MEMBER)", username)
                 fallback_direct_attempt_ms = (time.time() * 1000) - fallback_started_ms
 
             fetch_time_ms = time.time() * 1000 - start_ms
@@ -489,6 +478,9 @@ def worker_capabilities() -> dict[str, bool]:
         "accurate_current_load": True,
         "request_timing_v1": True,
         "assignment_attempt_v1": True,
+        # Fetches from the RuneScape Platform API; the master refuses
+        # assignments to workers without it (RuneMetrics retired 2026-11-10).
+        "platform_api_v1": True,
     }
 
 
